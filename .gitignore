@@ -1,0 +1,49 @@
+# Binaries
+bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Go
+/vendor/
+go.sum
+go.mod.backup
+
+# Database
+*.db
+*.db-journal
+
+# IDE
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Docs
+docs/
+*.docx
+
+# Markdown (except root docs)
+*.md
+!README*.md
+!CODE_OF_CONDUCT.md
+!CONTRIBUTING.md
+!LICENSE
+
+# Project specific
+.kiro/
+admin-frontend/node_modules/
+admin-frontend/.env
+admin-frontend/dist/
+
+# Logs
+*.log
+logs/
+
+# Temp files
+*.tmp
+*.temp
+.cache/

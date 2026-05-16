@@ -1,0 +1,18 @@
+server:
+  port: 8080
+  mode: debug          # debug | release | test
+
+database:
+  type: sqlite3
+  path: adlab.db
+  host: localhost
+  port: 5432
+  user: adlab
+  password: adlab
+  dbname: adlab
+  sslmode: disable
+  timezone: Asia/Shanghai
+
+dsp:
+  default_timeout_ms: 200
+  max_concurrency: 10

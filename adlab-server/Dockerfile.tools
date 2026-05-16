@@ -1,0 +1,14 @@
+ARG GO_BASE_IMAGE=golang:1.23-alpine
+
+FROM ${GO_BASE_IMAGE}
+
+WORKDIR /app
+
+RUN apk add --no-cache build-base
+
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+
+CMD ["go", "run", "scripts/seed.go"]
