@@ -220,14 +220,14 @@ export default function SourceList() {
   return (
     <Flex vertical gap={18}>
       <SectionIntro
-        eyebrow="Network Routing"
-        title="Ad Network Registry"
-        description="Manage mediated demand sources, review their routing mode, and verify whether each network is fully configured for bidding or fallback use."
+        eyebrow="Demand Templates"
+        title="Demand Source Templates"
+        description="Manage reusable demand-source templates, default bidding behavior, and simulator routing without mixing in app-level SDK initialization ownership."
       />
 
       <SurfaceNote
         title="Recommended use"
-        text="Use this page as the source-of-truth for demand inventory. Keep simulator sources separated from SDK-backed networks and use the config column to quickly spot incomplete setup."
+        text="Use this page to define reusable network templates and fallback simulators. App-level SDK initialization should be managed from the application detail panel, while this page focuses on default routing and bidding behavior."
         tone="default"
       />
 

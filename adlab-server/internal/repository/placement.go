@@ -12,6 +12,18 @@ type PlacementSourceBinding struct {
 	Source *model.AdSource `json:"source,omitempty"`
 }
 
+type BindSourceParams struct {
+	PlacementID        string
+	SourceID           string
+	InstanceID         string
+	InstanceName       string
+	AdUnitID           string
+	TimeoutMsOverride  int
+	FloorPriceOverride float64
+	LoadParamsJSON     string
+	Status             string
+}
+
 // PlacementRepository 广告位数据访问层
 type PlacementRepository struct {
 	db *gorm.DB
@@ -157,34 +169,103 @@ func (r *PlacementRepository) FindWithSources(placementID string) (*model.Placem
 	return placement, nil
 }
 
-// BindSource 绑定广告源到广告位
-func (r *PlacementRepository) BindSource(placementID, sourceID string, adUnitID ...string) error {
-	ps := model.PlacementSource{
-		PlacementID: placementID,
-		SourceID:    sourceID,
-		Status:      "active",
-	}
-	tx := r.db.Where("placement_id = ? AND source_id = ?", placementID, sourceID).First(&ps)
+// BindSourceDetailed 以实例级字段绑定广告源到广告位
+func (r *PlacementRepository) BindSourceDetailed(params BindSourceParams) error {
+	existing := model.PlacementSource{}
+	tx := r.db.Where("placement_id = ? AND source_id = ?", params.PlacementID, params.SourceID).First(&existing)
 	if tx.Error != nil && tx.Error != gorm.ErrRecordNotFound {
 		return errors.Wrap(errors.CodeDatabaseError, "查询绑定广告源失败", tx.Error)
 	}
 
-	if len(adUnitID) > 0 {
-		ps.AdUnitID = adUnitID[0]
-	}
-	ps.Status = "active"
-
 	if tx.Error == gorm.ErrRecordNotFound {
+		ps := model.PlacementSource{
+			PlacementID:        params.PlacementID,
+			SourceID:           params.SourceID,
+			InstanceID:         params.InstanceID,
+			InstanceName:       params.InstanceName,
+			AdUnitID:           params.AdUnitID,
+			TimeoutMsOverride:  params.TimeoutMsOverride,
+			FloorPriceOverride: params.FloorPriceOverride,
+			LoadParamsJSON:     params.LoadParamsJSON,
+			Status:             params.Status,
+		}
+		if ps.InstanceID == "" {
+			ps.InstanceID = params.PlacementID + "_" + params.SourceID
+		}
+		if ps.Status == "" {
+			ps.Status = "active"
+		}
 		if err := r.db.Create(&ps).Error; err != nil {
 			return errors.Wrap(errors.CodeDatabaseError, "绑定广告源失败", err)
 		}
 		return nil
 	}
 
-	if err := r.db.Save(&ps).Error; err != nil {
+	if params.InstanceID != "" {
+		existing.InstanceID = params.InstanceID
+	}
+	if existing.InstanceID == "" {
+		existing.InstanceID = params.PlacementID + "_" + params.SourceID
+	}
+	existing.InstanceName = params.InstanceName
+	existing.AdUnitID = params.AdUnitID
+	existing.TimeoutMsOverride = params.TimeoutMsOverride
+	existing.FloorPriceOverride = params.FloorPriceOverride
+	existing.LoadParamsJSON = params.LoadParamsJSON
+	if params.Status != "" {
+		existing.Status = params.Status
+	} else {
+		existing.Status = "active"
+	}
+
+	if err := r.db.Save(&existing).Error; err != nil {
 		return errors.Wrap(errors.CodeDatabaseError, "绑定广告源失败", err)
 	}
 	return nil
+}
+
+// UpdateBindingByInstanceID 按实例 ID 更新绑定记录
+func (r *PlacementRepository) UpdateBindingByInstanceID(instanceID string, params BindSourceParams) error {
+	existing := model.PlacementSource{}
+	if err := r.db.Where("instance_id = ?", instanceID).First(&existing).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return errors.New(errors.CodeEntityNotFound, "实例绑定不存在: "+instanceID)
+		}
+		return errors.Wrap(errors.CodeDatabaseError, "查询实例绑定失败", err)
+	}
+
+	if params.PlacementID != "" {
+		existing.PlacementID = params.PlacementID
+	}
+	if params.SourceID != "" {
+		existing.SourceID = params.SourceID
+	}
+	existing.InstanceName = params.InstanceName
+	existing.AdUnitID = params.AdUnitID
+	existing.TimeoutMsOverride = params.TimeoutMsOverride
+	existing.FloorPriceOverride = params.FloorPriceOverride
+	existing.LoadParamsJSON = params.LoadParamsJSON
+	if params.Status != "" {
+		existing.Status = params.Status
+	}
+
+	if err := r.db.Save(&existing).Error; err != nil {
+		return errors.Wrap(errors.CodeDatabaseError, "更新实例绑定失败", err)
+	}
+	return nil
+}
+
+// BindSource 绑定广告源到广告位
+func (r *PlacementRepository) BindSource(placementID, sourceID string, adUnitID ...string) error {
+	params := BindSourceParams{
+		PlacementID: placementID,
+		SourceID:    sourceID,
+		Status:      "active",
+	}
+	if len(adUnitID) > 0 {
+		params.AdUnitID = adUnitID[0]
+	}
+	return r.BindSourceDetailed(params)
 }
 
 // UnbindSource 解绑广告源

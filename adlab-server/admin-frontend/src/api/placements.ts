@@ -18,12 +18,39 @@ export const updatePlacement = (id: string, data: Partial<Placement>) =>
 export const deletePlacement = (id: string) =>
   client.delete<any, any>(`${BASE}/${id}`)
 
-export const bindSource = (placementId: string, sourceId: string, adUnitId?: string) =>
+export const bindSource = (
+  placementId: string,
+  sourceId: string,
+  payload?: {
+    instance_id?: string
+    instance_name?: string
+    ad_unit_id?: string
+    timeout_ms_override?: number
+    floor_price_override?: number
+    load_params_json?: string
+    status?: string
+  },
+) =>
   client.post('/admin/placement-sources', {
     placement_id: placementId,
     source_id: sourceId,
-    ad_unit_id: adUnitId,
+    ...payload,
   })
+
+export const updateBinding = (
+  instanceId: string,
+  payload: {
+    placement_id?: string
+    source_id?: string
+    instance_name?: string
+    ad_unit_id?: string
+    timeout_ms_override?: number
+    floor_price_override?: number
+    load_params_json?: string
+    status?: string
+  },
+) =>
+  client.put(`/admin/placement-sources/${instanceId}`, payload)
 
 export const unbindSource = (placementId: string, sourceId: string) =>
   client.delete('/admin/placement-sources', { data: { placement_id: placementId, source_id: sourceId } })

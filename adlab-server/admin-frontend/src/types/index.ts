@@ -39,6 +39,7 @@ export interface App {
   created_at?: string
   updated_at?: string
   placements?: Placement[]
+  app_network_configs?: AppNetworkConfig[]
 }
 
 export type AdType = 'rewarded_video' | 'interstitial' | 'banner' | 'native'
@@ -116,11 +117,29 @@ export interface AdSource {
 export interface PlacementSourceBinding {
   placement_id: string
   source_id: string
+  instance_id?: string
+  instance_name?: string
   ad_unit_id?: string
+  timeout_ms_override?: number
+  floor_price_override?: number
+  load_params_json?: string
   status: Status
   created_at?: string
   updated_at?: string
   source?: AdSource
+}
+
+export interface AppNetworkConfig {
+  id?: number
+  app_id: string
+  platform: Platform | 'both'
+  network_type: NetworkType
+  adapter_class?: string
+  init_params_json?: string
+  min_sdk_version?: string
+  status: Status
+  created_at?: string
+  updated_at?: string
 }
 
 export interface DSPConfig {

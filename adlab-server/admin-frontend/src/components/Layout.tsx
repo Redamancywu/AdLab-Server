@@ -19,6 +19,7 @@ import {
   ExperimentOutlined,
   ToolOutlined,
   PlayCircleOutlined,
+  EditOutlined,
 } from '@ant-design/icons'
 
 const { Sider, Content, Header } = Layout
@@ -38,6 +39,7 @@ const PAGE_TITLES: Record<string, { titleKey: string; subKey: string }> = {
   '/change-logs': { titleKey: 'pages.auditLog.title', subKey: 'pages.auditLog.sub' },
   '/settings': { titleKey: 'pages.settings.title', subKey: 'pages.settings.sub' },
   '/ad-player': { titleKey: 'pages.adPlayer.title', subKey: 'pages.adPlayer.sub' },
+  '/docs-editor': { titleKey: 'pages.docsEditor.title', subKey: 'pages.docsEditor.sub' },
 }
 
 export default function AppLayout() {
@@ -86,6 +88,7 @@ export default function AppLayout() {
           { key: '/logs', icon: <FileTextOutlined />, label: t('nav.bidLogs') },
           { key: '/scenarios', icon: <SwapOutlined />, label: t('nav.scenarios') },
           { key: '/ad-player', icon: <PlayCircleOutlined />, label: t('nav.adPlayer') },
+          { key: '/docs-editor', icon: <EditOutlined />, label: t('nav.docsEditor') },
         ],
       },
       {

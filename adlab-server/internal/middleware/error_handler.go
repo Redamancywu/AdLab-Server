@@ -1,7 +1,7 @@
 package middleware
 
 import (
-	"log"
+	"log/slog"
 	"net/http"
 	"runtime/debug"
 
@@ -14,7 +14,7 @@ func Recovery() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		defer func() {
 			if r := recover(); r != nil {
-				log.Printf("[PANIC] %v\n%s", r, debug.Stack())
+				slog.Error("panic recovered", "error", r, "stack", string(debug.Stack()))
 				c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
 					"code":    9002,
 					"message": "服务器内部错误",

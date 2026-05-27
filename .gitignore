@@ -29,15 +29,18 @@ docs/
 # Markdown (except root docs)
 *.md
 !README*.md
+!CHANGELOG*.md
 !CODE_OF_CONDUCT.md
 !CONTRIBUTING.md
 !LICENSE
 
 # Project specific
 .kiro/
-admin-frontend/node_modules/
-admin-frontend/.env
-admin-frontend/dist/
+adlab-server/admin-frontend/node_modules/
+adlab-server/admin-frontend/.env
+adlab-server/admin-frontend/dist/
+adlab-server/admin-frontend/.vite/
+adlab-server/server
 
 # Logs
 *.log

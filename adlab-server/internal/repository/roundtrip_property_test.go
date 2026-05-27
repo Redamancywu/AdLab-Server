@@ -193,6 +193,70 @@ func TestAdSourceRoundTripProperty(t *testing.T) {
 }
 
 // ============================================================
+// 属性 2：AppNetworkConfig 持久化 Round-Trip
+// ============================================================
+
+// TestAppNetworkConfigRoundTrip 验证 AppNetworkConfig 创建后查询字段一致性
+// 属性：对任意有效 AppNetworkConfig，Create 后 FindByAppAndPlatform，字段应与创建时完全一致
+// Validates: Requirements 2.1
+func TestAppNetworkConfigRoundTrip(t *testing.T) {
+	const iterations = 25
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	platforms := []string{"ios", "android", "both"}
+	networks := []string{"admob", "applovin", "pangle"}
+
+	for i := 0; i < iterations; i++ {
+		db := setupTestDB(t)
+		appRepo := repository.NewAppRepository(db)
+		cfgRepo := repository.NewAppNetworkConfigRepository(db)
+
+		app := &model.App{
+			AppID:              randID(r, "app"),
+			Name:               randString(r, 32),
+			Platform:           platforms[r.Intn(len(platforms))],
+			BundleID:           "com.example." + randString(r, 12),
+			Category:           "game",
+			Status:             "active",
+			EnableMockFallback: true,
+		}
+		if err := appRepo.Create(app); err != nil {
+			t.Fatalf("迭代 %d: 创建 App 失败: %v", i, err)
+		}
+
+		initParams := fmt.Sprintf(`{"app_id":"%s","sdk_key":"%s"}`, randID(r, "appid"), randID(r, "sdk"))
+		cfg := &model.AppNetworkConfig{
+			AppID:          app.AppID,
+			Platform:       app.Platform,
+			NetworkType:    networks[r.Intn(len(networks))],
+			AdapterClass:   "Adapter" + randString(r, 10),
+			InitParamsJSON: initParams,
+			MinSDKVersion:  "1.0.0",
+			Status:         "active",
+		}
+		if err := cfgRepo.Create(cfg); err != nil {
+			t.Fatalf("迭代 %d: 创建 AppNetworkConfig 失败: %v", i, err)
+		}
+
+		found, err := cfgRepo.FindByAppAndPlatform(app.AppID, app.Platform)
+		if err != nil {
+			t.Fatalf("迭代 %d: 查询 AppNetworkConfig 失败: %v", i, err)
+		}
+		if len(found) != 1 {
+			t.Fatalf("迭代 %d: 期望 1 条 AppNetworkConfig, 实际 %d", i, len(found))
+		}
+		if found[0].NetworkType != cfg.NetworkType {
+			t.Errorf("迭代 %d: NetworkType 不一致: 期望 %q, 实际 %q", i, cfg.NetworkType, found[0].NetworkType)
+		}
+		if found[0].InitParamsJSON != cfg.InitParamsJSON {
+			t.Errorf("迭代 %d: InitParamsJSON 不一致: 期望 %q, 实际 %q", i, cfg.InitParamsJSON, found[0].InitParamsJSON)
+		}
+		if found[0].AdapterClass != cfg.AdapterClass {
+			t.Errorf("迭代 %d: AdapterClass 不一致: 期望 %q, 实际 %q", i, cfg.AdapterClass, found[0].AdapterClass)
+		}
+	}
+}
+
+// ============================================================
 // 属性 2：DSPConfig 持久化 Round-Trip
 // ============================================================
 

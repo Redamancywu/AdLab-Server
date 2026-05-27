@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"strings"
 	"sync"
@@ -71,6 +72,7 @@ type S2SBiddingService struct {
 	appRepo        *repository.AppRepository
 	maxConcurrency int
 	localBaseURL   string
+	circuitBreaker *CircuitBreaker // DSP 履断器
 }
 
 // NewS2SBiddingService 创建 S2SBiddingService
@@ -89,6 +91,7 @@ func NewS2SBiddingService(
 		appRepo:        appRepo,
 		maxConcurrency: 10,
 		localBaseURL:   "http://localhost:8080",
+		circuitBreaker: NewCircuitBreaker(), // 每个 S2SBiddingService 实例拥有独立的断路器
 	}
 }
 
@@ -147,8 +150,7 @@ func (s *S2SBiddingService) Bid(ctx context.Context, req *S2SBidRequest) (*S2SBi
 			ErrorMsg:  result.errMsg,
 		}
 		if err := s.bidDetailRepo.Create(detail); err != nil {
-			// 日志写入失败不影响竞价结果，但需要记录
-			_ = err // TODO: 引入结构化日志后替换为 logger.Error
+			slog.Error("写入竞价明细日志失败", "request_id", requestID, "dsp_id", result.sourceID, "error", err)
 		}
 	}
 
@@ -279,10 +281,31 @@ func (s *S2SBiddingService) concurrentBid(ctx context.Context, ortbReq *openrtb.
 	for idx, src := range sources {
 		idx, src := idx, src // capture loop variables
 		g.Go(func() error {
+			// 检查断路器是否熔断：已熔断则跳过，记录为 timeout
+			if s.circuitBreaker.IsOpen(src.SourceID) {
+				mu.Lock()
+				results[idx] = dspBidResult{
+					sourceID: src.SourceID,
+					status:   "timeout",
+					errMsg:   "断路器熔断，跳过 DSP 请求",
+				}
+				mu.Unlock()
+				return nil
+			}
+
 			sem <- struct{}{}
 			defer func() { <-sem }()
 
 			result := s.bidFromDSP(gCtx, src, ortbReq)
+
+			// 向断路器反馈结果
+			if result.status == "win" || result.status == "lose" || result.status == "no_bid" {
+				s.circuitBreaker.RecordSuccess(src.SourceID)
+			} else {
+				// timeout 或 error 计为失败
+				s.circuitBreaker.RecordFailure(src.SourceID)
+			}
+
 			mu.Lock()
 			results[idx] = result
 			mu.Unlock()

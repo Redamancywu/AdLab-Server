@@ -7,7 +7,10 @@ import (
 // AutoMigrate 执行所有模型的自动迁移
 func AutoMigrate(db *gorm.DB) error {
 	return db.AutoMigrate(
+		&Tenant{},
+		&User{},
 		&App{},
+		&AppNetworkConfig{},
 		&Placement{},
 		&AdSource{},
 		&PlacementSource{},
@@ -19,5 +22,6 @@ func AutoMigrate(db *gorm.DB) error {
 		&TrackingEventLog{},
 		&C2SReportLog{},
 		&ConfigChangeLog{},
+		&Document{},
 	)
 }

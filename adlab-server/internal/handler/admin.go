@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -21,6 +22,7 @@ import (
 type AdminHandler struct {
 	placementRepo   *repository.PlacementRepository
 	sourceRepo      *repository.AdSourceRepository
+	appNetworkConfigRepo *repository.AppNetworkConfigRepository
 	dspConfigRepo   *repository.DSPConfigRepository
 	materialRepo    *repository.MaterialRepository
 	changeLogRepo   *repository.ConfigChangeLogRepository
@@ -35,6 +37,7 @@ type AdminHandler struct {
 func NewAdminHandler(
 	placementRepo *repository.PlacementRepository,
 	sourceRepo *repository.AdSourceRepository,
+	appNetworkConfigRepo *repository.AppNetworkConfigRepository,
 	dspConfigRepo *repository.DSPConfigRepository,
 	materialRepo *repository.MaterialRepository,
 	changeLogRepo *repository.ConfigChangeLogRepository,
@@ -45,6 +48,7 @@ func NewAdminHandler(
 	return &AdminHandler{
 		placementRepo: placementRepo,
 		sourceRepo:    sourceRepo,
+		appNetworkConfigRepo: appNetworkConfigRepo,
 		dspConfigRepo: dspConfigRepo,
 		materialRepo:  materialRepo,
 		changeLogRepo: changeLogRepo,
@@ -331,9 +335,15 @@ func (h *AdminHandler) DeleteSource(c *gin.Context) {
 
 // BindSourceRequest 绑定请求体
 type BindSourceRequest struct {
-	PlacementID string `json:"placement_id"`
-	SourceID    string `json:"source_id"`
-	AdUnitID    string `json:"ad_unit_id,omitempty"`
+	PlacementID         string  `json:"placement_id"`
+	SourceID            string  `json:"source_id"`
+	InstanceID          string  `json:"instance_id,omitempty"`
+	InstanceName        string  `json:"instance_name,omitempty"`
+	AdUnitID            string  `json:"ad_unit_id,omitempty"`
+	TimeoutMsOverride   int     `json:"timeout_ms_override,omitempty"`
+	FloorPriceOverride  float64 `json:"floor_price_override,omitempty"`
+	LoadParamsJSON      string  `json:"load_params_json,omitempty"`
+	Status              string  `json:"status,omitempty"`
 }
 
 // BindSource 处理 POST /admin/placement-sources
@@ -348,12 +358,52 @@ func (h *AdminHandler) BindSource(c *gin.Context) {
 		return
 	}
 
-	if err := h.placementRepo.BindSource(req.PlacementID, req.SourceID, req.AdUnitID); err != nil {
+	if err := h.placementRepo.BindSourceDetailed(repository.BindSourceParams{
+		PlacementID:        req.PlacementID,
+		SourceID:           req.SourceID,
+		InstanceID:         req.InstanceID,
+		InstanceName:       req.InstanceName,
+		AdUnitID:           req.AdUnitID,
+		TimeoutMsOverride:  req.TimeoutMsOverride,
+		FloorPriceOverride: req.FloorPriceOverride,
+		LoadParamsJSON:     req.LoadParamsJSON,
+		Status:             req.Status,
+	}); err != nil {
 		h.handleRepoError(c, err)
 		return
 	}
 	h.recordChangeLog("placement_source", req.PlacementID+":"+req.SourceID, "bind", "", "")
 	c.JSON(http.StatusOK, SuccessResponse{Code: apperrors.CodeSuccess, Message: "bound", Data: nil})
+}
+
+// UpdateBinding 处理 PUT /admin/placement-sources/:instance_id
+func (h *AdminHandler) UpdateBinding(c *gin.Context) {
+	instanceID := c.Param("instance_id")
+	var req BindSourceRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		h.validationError(c, err.Error())
+		return
+	}
+	if instanceID == "" {
+		h.validationError(c, "instance_id 为必填字段")
+		return
+	}
+
+	if err := h.placementRepo.UpdateBindingByInstanceID(instanceID, repository.BindSourceParams{
+		PlacementID:        req.PlacementID,
+		SourceID:           req.SourceID,
+		InstanceName:       req.InstanceName,
+		AdUnitID:           req.AdUnitID,
+		TimeoutMsOverride:  req.TimeoutMsOverride,
+		FloorPriceOverride: req.FloorPriceOverride,
+		LoadParamsJSON:     req.LoadParamsJSON,
+		Status:             req.Status,
+	}); err != nil {
+		h.handleRepoError(c, err)
+		return
+	}
+	h.recordChangeLog("placement_source", instanceID, "update", "", "")
+	c.JSON(http.StatusOK, SuccessResponse{Code: apperrors.CodeSuccess, Message: "updated", Data: nil})
 }
 
 // UnbindSource 处理 DELETE /admin/placement-sources
@@ -852,6 +902,119 @@ func (h *AdminHandler) GetAppWithPlacements(c *gin.Context) {
 	c.JSON(http.StatusOK, SuccessResponse{Code: apperrors.CodeSuccess, Message: "success", Data: app})
 }
 
+type AppNetworkConfigRequest struct {
+	Platform       string `json:"platform"`
+	NetworkType    string `json:"network_type"`
+	AdapterClass   string `json:"adapter_class"`
+	InitParamsJSON string `json:"init_params_json"`
+	MinSDKVersion  string `json:"min_sdk_version"`
+	Status         string `json:"status"`
+}
+
+// ListAppNetworkConfigs 处理 GET /admin/apps/:id/network-configs
+func (h *AdminHandler) ListAppNetworkConfigs(c *gin.Context) {
+	appID := c.Param("id")
+	items, err := h.appNetworkConfigRepo.FindByAppAndPlatform(appID, "")
+	if err != nil {
+		h.handleRepoError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, SuccessResponse{Code: apperrors.CodeSuccess, Message: "success", Data: items})
+}
+
+// CreateAppNetworkConfig 处理 POST /admin/apps/:id/network-configs
+func (h *AdminHandler) CreateAppNetworkConfig(c *gin.Context) {
+	appID := c.Param("id")
+	var req AppNetworkConfigRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		h.validationError(c, err.Error())
+		return
+	}
+	if req.NetworkType == "" {
+		h.validationError(c, "network_type 为必填字段")
+		return
+	}
+
+	cfg := &model.AppNetworkConfig{
+		AppID:          appID,
+		Platform:       req.Platform,
+		NetworkType:    req.NetworkType,
+		AdapterClass:   req.AdapterClass,
+		InitParamsJSON: req.InitParamsJSON,
+		MinSDKVersion:  req.MinSDKVersion,
+		Status:         req.Status,
+	}
+	if cfg.Platform == "" {
+		cfg.Platform = "both"
+	}
+	if cfg.Status == "" {
+		cfg.Status = "active"
+	}
+
+	if err := h.appNetworkConfigRepo.Create(cfg); err != nil {
+		h.handleRepoError(c, err)
+		return
+	}
+	h.recordChangeLog("app_network_config", fmt.Sprintf("%s:%d", appID, cfg.ID), "create", "", toJSON(cfg))
+	c.JSON(http.StatusCreated, SuccessResponse{Code: apperrors.CodeSuccess, Message: "created", Data: cfg})
+}
+
+// UpdateAppNetworkConfig 处理 PUT /admin/apps/:id/network-configs/:config_id
+func (h *AdminHandler) UpdateAppNetworkConfig(c *gin.Context) {
+	appID := c.Param("id")
+	configID := parseUintParam(c, "config_id")
+	existing, err := h.appNetworkConfigRepo.FindByID(configID)
+	if err != nil {
+		h.handleRepoError(c, err)
+		return
+	}
+	if existing.AppID != appID {
+		h.validationError(c, "配置不属于当前应用")
+		return
+	}
+
+	oldVal := toJSON(*existing)
+	if err := c.ShouldBindJSON(existing); err != nil {
+		h.validationError(c, err.Error())
+		return
+	}
+	existing.AppID = appID
+	if existing.Platform == "" {
+		existing.Platform = "both"
+	}
+	if existing.Status == "" {
+		existing.Status = "active"
+	}
+
+	if err := h.appNetworkConfigRepo.Update(existing); err != nil {
+		h.handleRepoError(c, err)
+		return
+	}
+	h.recordChangeLog("app_network_config", fmt.Sprintf("%s:%d", appID, existing.ID), "update", oldVal, toJSON(*existing))
+	c.JSON(http.StatusOK, SuccessResponse{Code: apperrors.CodeSuccess, Message: "updated", Data: existing})
+}
+
+// DeleteAppNetworkConfig 处理 DELETE /admin/apps/:id/network-configs/:config_id
+func (h *AdminHandler) DeleteAppNetworkConfig(c *gin.Context) {
+	appID := c.Param("id")
+	configID := parseUintParam(c, "config_id")
+	existing, err := h.appNetworkConfigRepo.FindByID(configID)
+	if err != nil {
+		h.handleRepoError(c, err)
+		return
+	}
+	if existing.AppID != appID {
+		h.validationError(c, "配置不属于当前应用")
+		return
+	}
+	if err := h.appNetworkConfigRepo.Delete(configID); err != nil {
+		h.handleRepoError(c, err)
+		return
+	}
+	h.recordChangeLog("app_network_config", fmt.Sprintf("%s:%d", appID, configID), "delete", toJSON(*existing), "")
+	c.JSON(http.StatusOK, SuccessResponse{Code: apperrors.CodeSuccess, Message: "deleted", Data: nil})
+}
+
 // ─────────────────────────────────────────────
 // 辅助方法
 // ─────────────────────────────────────────────
@@ -918,6 +1081,18 @@ func toJSON(v interface{}) string {
 		return ""
 	}
 	return string(b)
+}
+
+func parseUintParam(c *gin.Context, key string) uint {
+	raw := c.Param(key)
+	if raw == "" {
+		return 0
+	}
+	value, err := strconv.ParseUint(raw, 10, 64)
+	if err != nil {
+		return 0
+	}
+	return uint(value)
 }
 
 // invalidateCacheBySource 查询广告源关联的所有广告位，逐一失效策略缓存

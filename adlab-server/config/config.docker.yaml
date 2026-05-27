@@ -2,6 +2,15 @@ server:
   port: 8080
   mode: release
 
+sdkapi:
+  port: 8080
+  enable_docs: true
+  enable_lab: true
+  enable_health: true
+  rate_limit_enabled: true
+  rate_limit_rps: 100
+  rate_limit_burst: 200
+
 database:
   type: postgres
   host: postgres

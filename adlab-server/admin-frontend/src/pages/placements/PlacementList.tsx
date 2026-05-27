@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
-import { Badge, Button, Divider, Drawer, Flex, Input, Select, Space, Statistic, Table, Tag, Typography } from 'antd'
+import { Badge, Button, Divider, Drawer, Flex, Input, InputNumber, Select, Space, Statistic, Table, Tag, Typography } from 'antd'
 import { EditOutlined, LinkOutlined, PlusCircleOutlined, PlusOutlined } from '@ant-design/icons'
 import { useTranslation } from 'react-i18next'
-import { bindSource, deletePlacement, getPlacementWithSources, listPlacements, unbindSource } from '../../api/placements'
+import { bindSource, deletePlacement, getPlacementWithSources, listPlacements, unbindSource, updateBinding } from '../../api/placements'
 import { listSources } from '../../api/sources'
 import type { AdSource, Placement, PlacementSourceBinding } from '../../types'
 import { msg } from '../../hooks/useMessage'
@@ -40,7 +40,12 @@ export default function PlacementList() {
   const [allSources, setAllSources] = useState<AdSource[]>([])
   const [sourceFormOpen, setSourceFormOpen] = useState(false)
   const [selectedSourceId, setSelectedSourceId] = useState<string | undefined>()
+  const [selectedInstanceName, setSelectedInstanceName] = useState('')
   const [selectedAdUnitId, setSelectedAdUnitId] = useState('')
+  const [selectedTimeoutOverride, setSelectedTimeoutOverride] = useState<number | null>(null)
+  const [selectedFloorOverride, setSelectedFloorOverride] = useState<number | null>(null)
+  const [selectedLoadParamsJSON, setSelectedLoadParamsJSON] = useState('')
+  const [editingBindingSourceId, setEditingBindingSourceId] = useState<string | null>(null)
   const [binding, setBinding] = useState(false)
 
   const load = () => {
@@ -63,13 +68,32 @@ export default function PlacementList() {
     load()
   }
 
+  const resetBindingForm = () => {
+    setSelectedSourceId(undefined)
+    setSelectedInstanceName('')
+    setSelectedAdUnitId('')
+    setSelectedTimeoutOverride(null)
+    setSelectedFloorOverride(null)
+    setSelectedLoadParamsJSON('')
+    setEditingBindingSourceId(null)
+  }
+
+  const startEditBinding = (binding: PlacementSourceBinding) => {
+    setEditingBindingSourceId(binding.instance_id || binding.source_id)
+    setSelectedSourceId(binding.source_id)
+    setSelectedInstanceName(binding.instance_name || '')
+    setSelectedAdUnitId(binding.ad_unit_id || '')
+    setSelectedTimeoutOverride(binding.timeout_ms_override ?? null)
+    setSelectedFloorOverride(binding.floor_price_override ?? null)
+    setSelectedLoadParamsJSON(binding.load_params_json || '')
+  }
+
   const openDetail = async (placement: Placement) => {
     const full = await getPlacementWithSources(placement.placement_id)
     setDetailPlacement(full)
     const sourcePage = await listSources(1, 200)
     setAllSources(sourcePage.items ?? [])
-    setSelectedSourceId(undefined)
-    setSelectedAdUnitId('')
+    resetBindingForm()
     setDetailOpen(true)
   }
 
@@ -83,10 +107,28 @@ export default function PlacementList() {
     if (!detailPlacement || !selectedSourceId) return
     setBinding(true)
     try {
-      await bindSource(detailPlacement.placement_id, selectedSourceId, selectedAdUnitId || undefined)
+      if (editingBindingSourceId) {
+        await updateBinding(editingBindingSourceId, {
+          placement_id: detailPlacement.placement_id,
+          source_id: selectedSourceId,
+          instance_name: selectedInstanceName || undefined,
+          ad_unit_id: selectedAdUnitId || undefined,
+          timeout_ms_override: selectedTimeoutOverride ?? undefined,
+          floor_price_override: selectedFloorOverride ?? undefined,
+          load_params_json: selectedLoadParamsJSON || undefined,
+          status: 'active',
+        })
+      } else {
+        await bindSource(detailPlacement.placement_id, selectedSourceId, {
+          instance_name: selectedInstanceName || undefined,
+          ad_unit_id: selectedAdUnitId || undefined,
+          timeout_ms_override: selectedTimeoutOverride ?? undefined,
+          floor_price_override: selectedFloorOverride ?? undefined,
+          load_params_json: selectedLoadParamsJSON || undefined,
+        })
+      }
       msg.success(t('common.success'))
-      setSelectedSourceId(undefined)
-      setSelectedAdUnitId('')
+      resetBindingForm()
       await refreshDetail()
     } finally {
       setBinding(false)
@@ -180,8 +222,11 @@ export default function PlacementList() {
 
   const boundIds = new Set((detailPlacement?.placement_sources ?? []).map((binding) => binding.source_id))
   const unboundSources = allSources.filter((source) => !boundIds.has(source.source_id))
+  const selectableSources = editingBindingSourceId
+    ? allSources.filter((source) => !boundIds.has(source.source_id) || source.source_id === selectedSourceId)
+    : unboundSources
 
-  const selectOptions = unboundSources.map((source) => {
+  const selectOptions = selectableSources.map((source) => {
     const network = NETWORK_LABELS[source.network_type ?? 'custom'] ?? NETWORK_LABELS.custom
     return {
       value: source.source_id,
@@ -289,7 +334,7 @@ export default function PlacementList() {
       >
         <div className="glass-strip" style={{ borderRadius: 18, padding: '14px 16px', marginBottom: 16 }}>
           <Text strong style={{ fontSize: 14, display: 'block', marginBottom: 10 }}>
-            绑定广告源
+            {editingBindingSourceId ? '编辑实例' : '配置实例'}
           </Text>
           <Space direction="vertical" size={10} style={{ width: '100%' }}>
             <Select
@@ -303,7 +348,7 @@ export default function PlacementList() {
               options={selectOptions}
               optionLabelProp="label"
               notFoundContent={
-                unboundSources.length === 0 ? (
+                selectableSources.length === 0 ? (
                   <Text type="secondary" style={{ fontSize: 12 }}>
                     所有广告源已绑定
                   </Text>
@@ -315,13 +360,45 @@ export default function PlacementList() {
               }
             />
             <Input
+              value={selectedInstanceName}
+              onChange={(event) => setSelectedInstanceName(event.target.value)}
+              placeholder="实例名称（例如：Rewarded AdMob Main）"
+            />
+            <Input
               value={selectedAdUnitId}
               onChange={(event) => setSelectedAdUnitId(event.target.value)}
               placeholder="第三方广告位 ID（例如 ca-app-pub-xxx/yyy、Code ID、Placement ID）"
             />
-            <Button type="primary" icon={<PlusCircleOutlined />} disabled={!selectedSourceId} loading={binding} onClick={handleBind}>
-              绑定
-            </Button>
+            <Space size={10} style={{ width: '100%' }}>
+              <InputNumber
+                style={{ width: '100%' }}
+                min={0}
+                value={selectedTimeoutOverride ?? undefined}
+                onChange={(value) => setSelectedTimeoutOverride(typeof value === 'number' ? value : null)}
+                placeholder="超时覆盖 (ms)"
+              />
+              <InputNumber
+                style={{ width: '100%' }}
+                min={0}
+                step={0.01}
+                value={selectedFloorOverride ?? undefined}
+                onChange={(value) => setSelectedFloorOverride(typeof value === 'number' ? value : null)}
+                placeholder="底价覆盖 ($)"
+              />
+            </Space>
+            <Input.TextArea
+              rows={2}
+              value={selectedLoadParamsJSON}
+              onChange={(event) => setSelectedLoadParamsJSON(event.target.value)}
+              placeholder='请求级参数 JSON（例如 {"orientation":"portrait"}）'
+              style={{ fontFamily: 'monospace', fontSize: 12 }}
+            />
+            <Space>
+              <Button type="primary" icon={<PlusCircleOutlined />} disabled={!selectedSourceId} loading={binding} onClick={handleBind}>
+                {editingBindingSourceId ? '保存实例' : '绑定'}
+              </Button>
+              {editingBindingSourceId ? <Button onClick={resetBindingForm}>取消编辑</Button> : null}
+            </Space>
           </Space>
           <div style={{ marginTop: 8, display: 'flex', justifyContent: 'flex-end' }}>
             <Button size="small" type="link" icon={<PlusOutlined />} onClick={() => setSourceFormOpen(true)}>
@@ -346,6 +423,19 @@ export default function PlacementList() {
               rowKey="source_id"
               dataSource={detailPlacement?.placement_sources ?? []}
               columns={[
+                {
+                  title: '实例',
+                  key: 'instance',
+                  width: 200,
+                  render: (_: unknown, row: PlacementSourceBinding) => (
+                    <div>
+                      <Text style={{ fontSize: 13, fontWeight: 700 }}>{row.instance_name || '默认实例'}</Text>
+                      <div>
+                        {row.instance_id ? <IdTag value={row.instance_id} /> : <Text type="secondary">未生成</Text>}
+                      </div>
+                    </div>
+                  ),
+                },
                 {
                   title: t('source.name').toUpperCase(),
                   key: 'name',
@@ -385,6 +475,25 @@ export default function PlacementList() {
                   render: (value: string) => value ? <IdTag value={value} /> : <Text type="secondary">未配置</Text>,
                 },
                 {
+                  title: '覆盖参数',
+                  key: 'overrides',
+                  width: 180,
+                  render: (_: unknown, row: PlacementSourceBinding) => (
+                    <div style={{ lineHeight: 1.4 }}>
+                      <div>
+                        <Text type="secondary" style={{ fontSize: 11 }}>
+                          timeout: {row.timeout_ms_override ? `${row.timeout_ms_override}ms` : '默认'}
+                        </Text>
+                      </div>
+                      <div>
+                        <Text type="secondary" style={{ fontSize: 11 }}>
+                          floor: {row.floor_price_override ? `$${row.floor_price_override.toFixed(2)}` : '默认'}
+                        </Text>
+                      </div>
+                    </div>
+                  ),
+                },
+                {
                   title: t('source.priority').toUpperCase(),
                   key: 'priority',
                   width: 80,
@@ -399,11 +508,16 @@ export default function PlacementList() {
                 },
                 {
                   title: '',
-                  width: 80,
+                  width: 120,
                   render: (_: unknown, row: PlacementSourceBinding) => (
-                    <Button size="small" type="text" danger onClick={() => handleUnbind(row.source_id)}>
-                      {t('common.unbind')}
-                    </Button>
+                    <Space size={4}>
+                      <Button size="small" type="text" onClick={() => startEditBinding(row)}>
+                        编辑
+                      </Button>
+                      <Button size="small" type="text" danger onClick={() => handleUnbind(row.source_id)}>
+                        {t('common.unbind')}
+                      </Button>
+                    </Space>
                   ),
                 },
               ]}

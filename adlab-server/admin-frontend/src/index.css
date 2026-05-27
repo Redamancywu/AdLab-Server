@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@300;400;500;600;700;800&display=swap');
+
 *,
 *::before,
 *::after {
@@ -34,7 +36,7 @@ body,
 }
 
 body {
-  font-family: 'Inter', 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  font-family: 'Outfit', 'Inter', 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
   background:
     radial-gradient(circle at 10% 10%, rgba(232, 97, 44, 0.14), transparent 24%),
     radial-gradient(circle at 88% 12%, rgba(92, 163, 255, 0.18), transparent 20%),
@@ -47,6 +49,18 @@ body {
   text-rendering: optimizeLegibility;
 }
 
+@keyframes float-orb-1 {
+  0% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(60px, -40px) scale(1.15); }
+  100% { transform: translate(0, 0) scale(1); }
+}
+
+@keyframes float-orb-2 {
+  0% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-50px, 60px) scale(0.85); }
+  100% { transform: translate(0, 0) scale(1); }
+}
+
 body::before,
 body::after {
   content: '';
@@ -55,24 +69,27 @@ body::after {
   pointer-events: none;
   z-index: 0;
   border-radius: 999px;
-  filter: blur(60px);
-  opacity: 0.65;
+  opacity: 0.7;
 }
 
 body::before {
-  width: 260px;
-  height: 260px;
-  top: 92px;
-  left: 284px;
-  background: rgba(232, 97, 44, 0.18);
+  width: 420px;
+  height: 420px;
+  top: 60px;
+  left: 260px;
+  background: radial-gradient(circle, rgba(232, 97, 44, 0.22) 0%, transparent 80%);
+  animation: float-orb-1 25s infinite ease-in-out;
+  filter: blur(80px);
 }
 
 body::after {
-  width: 300px;
-  height: 300px;
-  right: 8%;
+  width: 460px;
+  height: 460px;
+  right: 6%;
   bottom: 10%;
-  background: rgba(92, 163, 255, 0.16);
+  background: radial-gradient(circle, rgba(92, 163, 255, 0.18) 0%, transparent 80%);
+  animation: float-orb-2 30s infinite ease-in-out;
+  filter: blur(90px);
 }
 
 a {
@@ -214,19 +231,20 @@ a {
 }
 
 .ant-table-thead > tr > th {
-  background: rgba(248, 250, 252, 0.72) !important;
+  background: rgba(255, 255, 255, 0.32) !important;
   font-size: 11px !important;
   font-weight: 700 !important;
-  color: var(--text-tertiary) !important;
+  color: var(--text-secondary) !important;
   text-transform: uppercase !important;
   letter-spacing: 0.8px !important;
-  border-bottom: 1px solid var(--border-soft) !important;
+  border-bottom: 1px solid rgba(231, 235, 243, 0.75) !important;
   padding: 12px 16px !important;
+  backdrop-filter: blur(4px);
 }
 
 .ant-table-tbody > tr > td {
   padding: 14px 16px !important;
-  border-bottom: 1px solid #f1f5f9 !important;
+  border-bottom: 1px solid rgba(231, 235, 243, 0.45) !important;
   vertical-align: middle !important;
   background: transparent !important;
 }
@@ -278,14 +296,19 @@ a {
 .ant-input-number,
 .ant-select-selector,
 .ant-picker {
-  border-color: var(--border) !important;
+  border-color: rgba(198, 208, 224, 0.45) !important;
+  background: rgba(255, 255, 255, 0.5) !important;
+  backdrop-filter: blur(8px) saturate(120%);
+  -webkit-backdrop-filter: blur(8px) saturate(120%);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
 }
 
 .ant-input:hover,
 .ant-input-number:hover,
 .ant-select:hover .ant-select-selector,
 .ant-picker:hover {
-  border-color: #c2cad7 !important;
+  border-color: rgba(232, 97, 44, 0.45) !important;
+  background: rgba(255, 255, 255, 0.7) !important;
 }
 
 .ant-input:focus,
@@ -293,7 +316,8 @@ a {
 .ant-select-focused .ant-select-selector,
 .ant-picker-focused {
   border-color: var(--accent) !important;
-  box-shadow: 0 0 0 4px rgba(232, 97, 44, 0.12) !important;
+  background: rgba(255, 255, 255, 0.85) !important;
+  box-shadow: 0 0 0 4px rgba(232, 97, 44, 0.16) !important;
 }
 
 .ant-modal-header,
@@ -397,4 +421,52 @@ a {
 
 ::-webkit-scrollbar-thumb:hover {
   background: #b8c1cc;
+}
+
+/* 微动效与微交互提升品质感 */
+.ant-btn {
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.ant-btn:hover {
+  transform: translateY(-1.5px) !important;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08) !important;
+}
+
+.ant-btn-primary:hover {
+  box-shadow: 0 12px 24px rgba(232, 97, 44, 0.32), inset 0 1px 0 rgba(255,255,255,0.25) !important;
+}
+
+.ant-btn:active {
+  transform: translateY(0) !important;
+}
+
+/* 表格行悬浮质感与微动效 */
+.ant-table-tbody > tr {
+  transition: all 0.2s ease !important;
+}
+
+.ant-table-tbody > tr:hover > td {
+  background: rgba(255, 255, 255, 0.65) !important;
+  backdrop-filter: blur(4px);
+}
+
+/* 卡片整体动效 */
+.page-card {
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.page-card:hover {
+  border-color: rgba(255, 255, 255, 0.8) !important;
+  box-shadow: 0 24px 64px rgba(15, 23, 42, 0.12), 0 8px 24px rgba(15, 23, 42, 0.06) !important;
+}
+
+/* 选项卡/标签高亮微调 */
+.ant-tag {
+  transition: transform 0.2s ease !important;
+  cursor: default;
+}
+
+.ant-tag:hover {
+  transform: scale(1.05);
 }

@@ -9,6 +9,9 @@ export const listApps = (page = 1, pageSize = 20) =>
 export const getAppWithPlacements = (id: string) =>
   client.get(`${BASE}/${id}/placements`).then(unwrap<App>)
 
+export const listAppNetworkConfigs = (id: string) =>
+  client.get(`${BASE}/${id}/network-configs`).then(unwrap)
+
 export const createApp = (data: Partial<App>) =>
   client.post(BASE, data).then(unwrap<App>)
 

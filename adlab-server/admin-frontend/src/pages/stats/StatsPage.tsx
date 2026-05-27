@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Button, Card, Col, DatePicker, Progress, Row, Space, Spin, Statistic, Switch, Table, Tabs, Tag, Typography } from 'antd'
 import { LineChartOutlined, ReloadOutlined, RiseOutlined, SyncOutlined, TeamOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
+import { useTranslation } from 'react-i18next'
 import { getDSPStats, getOverallStats, getTimeSeriesStats } from '../../api/stats'
 import type { BidStats, TimeSeriesBucket } from '../../types'
 import { CardHeader, PageCard, SectionIntro, SurfaceNote } from '../../components/ui'
@@ -9,11 +10,11 @@ import { CardHeader, PageCard, SectionIntro, SurfaceNote } from '../../component
 const { Text } = Typography
 const { RangePicker } = DatePicker
 
-function SimpleLineChart({ data, height = 140 }: { data: TimeSeriesBucket[]; height?: number }) {
+function SimpleLineChart({ data, height = 140, t }: { data: TimeSeriesBucket[]; height?: number; t: (key: string) => string }) {
   if (!data.length) {
     return (
       <div style={{ height, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <Text type="secondary">暂无数据</Text>
+        <Text type="secondary">{t('stats.noData')}</Text>
       </div>
     )
   }
@@ -48,11 +49,11 @@ function SimpleLineChart({ data, height = 140 }: { data: TimeSeriesBucket[]; hei
         <Space size={12}>
           <Space size={4}>
             <span style={{ display: 'inline-block', width: 12, height: 2, background: '#1677ff' }} />
-            <Text style={{ fontSize: 11 }}>请求量</Text>
+            <Text style={{ fontSize: 11 }}>{t('stats.trendVolume')}</Text>
           </Space>
           <Space size={4}>
             <span style={{ display: 'inline-block', width: 12, height: 2, background: '#12b981', borderTop: '1px dashed #12b981' }} />
-            <Text style={{ fontSize: 11 }}>填充率</Text>
+            <Text style={{ fontSize: 11 }}>{t('stats.trendFillRate')}</Text>
           </Space>
         </Space>
         <Text type="secondary" style={{ fontSize: 11 }}>{sorted[sorted.length - 1]?.hour}</Text>
@@ -61,7 +62,40 @@ function SimpleLineChart({ data, height = 140 }: { data: TimeSeriesBucket[]; hei
   )
 }
 
+function StatCard({
+  label,
+  value,
+  sub,
+  accent,
+}: {
+  label: string
+  value: string | number
+  sub?: string
+  accent?: string
+}) {
+  return (
+    <div className="stat-card" style={{ position: 'relative' }}>
+      <div
+        className="ambient-orb"
+        style={{
+          width: 96,
+          height: 96,
+          top: -8,
+          right: -4,
+          background: accent ? `${accent}22` : 'rgba(232, 97, 44, 0.14)',
+        }}
+      />
+      <div className="stat-label">{label}</div>
+      <div className="stat-value" style={accent ? { color: accent } : undefined}>
+        {value}
+      </div>
+      {sub ? <div className="stat-sub">{sub}</div> : null}
+    </div>
+  )
+}
+
 export default function StatsPage() {
+  const { t } = useTranslation()
   const [overallStats, setOverallStats] = useState<BidStats[]>([])
   const [dspStats, setDspStats] = useState<BidStats[]>([])
   const [timeSeries, setTimeSeries] = useState<TimeSeriesBucket[]>([])
@@ -115,16 +149,16 @@ export default function StatsPage() {
 
   const overallColumns = [
     {
-      title: '广告位',
+      title: t('stats.adUnit'),
       dataIndex: 'placement_id',
       key: 'placement_id',
       render: (value: string) => <Text code style={{ fontSize: 12 }}>{value}</Text>,
     },
-    { title: '总请求', dataIndex: 'total_requests', key: 'total_requests', align: 'right' as const },
-    { title: '成功', dataIndex: 'success_count', key: 'success_count', align: 'right' as const },
-    { title: '无填充', dataIndex: 'no_fill_count', key: 'no_fill_count', align: 'right' as const },
+    { title: t('stats.requests'), dataIndex: 'total_requests', key: 'total_requests', align: 'right' as const },
+    { title: t('stats.success'), dataIndex: 'success_count', key: 'success_count', align: 'right' as const },
+    { title: t('stats.noFill'), dataIndex: 'no_fill_count', key: 'no_fill_count', align: 'right' as const },
     {
-      title: '填充率',
+      title: t('stats.fillRate'),
       dataIndex: 'fill_rate',
       key: 'fill_rate',
       width: 170,
@@ -142,21 +176,21 @@ export default function StatsPage() {
       ),
     },
     {
-      title: '均价 (CPM)',
+      title: t('stats.avgCpm'),
       dataIndex: 'avg_bid_price',
       key: 'avg_bid_price',
       align: 'right' as const,
       render: (value: number) => <Text strong style={{ color: '#1677ff' }}>${value.toFixed(4)}</Text>,
     },
     {
-      title: '最高价',
+      title: t('stats.maxCpm'),
       dataIndex: 'max_bid_price',
       key: 'max_bid_price',
       align: 'right' as const,
       render: (value: number) => (value > 0 ? `$${value.toFixed(4)}` : '-'),
     },
     {
-      title: '均延迟',
+      title: t('stats.avgLatency'),
       dataIndex: 'avg_latency_ms',
       key: 'avg_latency_ms',
       align: 'right' as const,
@@ -169,25 +203,25 @@ export default function StatsPage() {
   ]
 
   const dspColumns = [
-    { title: 'DSP', dataIndex: 'dsp_id', key: 'dsp_id', render: (value: string) => <Text strong>{value}</Text> },
-    { title: '参与次数', dataIndex: 'total_requests', key: 'total_requests', align: 'right' as const },
-    { title: '出价次数', dataIndex: 'success_count', key: 'success_count', align: 'right' as const },
+    { title: t('stats.dsp'), dataIndex: 'dsp_id', key: 'dsp_id', render: (value: string) => <Text strong>{value}</Text> },
+    { title: t('stats.requests'), dataIndex: 'total_requests', key: 'total_requests', align: 'right' as const },
+    { title: t('stats.bids'), dataIndex: 'success_count', key: 'success_count', align: 'right' as const },
     {
-      title: '胜出次数',
+      title: t('stats.wins'),
       dataIndex: 'win_count',
       key: 'win_count',
       align: 'right' as const,
       render: (value: number) => <Text strong style={{ color: '#1677ff' }}>{value}</Text>,
     },
     {
-      title: '出价率',
+      title: t('stats.bidRate'),
       dataIndex: 'fill_rate',
       key: 'fill_rate',
       align: 'right' as const,
       render: (value: number) => `${value.toFixed(1)}%`,
     },
     {
-      title: '胜出率',
+      title: t('stats.winRate'),
       dataIndex: 'win_rate',
       key: 'win_rate',
       align: 'right' as const,
@@ -195,14 +229,14 @@ export default function StatsPage() {
         value != null ? <Tag color={value >= 30 ? 'success' : value >= 10 ? 'warning' : 'default'}>{value.toFixed(1)}%</Tag> : '-',
     },
     {
-      title: '均价 (CPM)',
+      title: t('stats.avgCpm'),
       dataIndex: 'avg_bid_price',
       key: 'avg_bid_price',
       align: 'right' as const,
       render: (value: number) => <Text style={{ color: '#1677ff' }}>${value.toFixed(4)}</Text>,
     },
     {
-      title: '均延迟',
+      title: t('stats.avgLatency'),
       dataIndex: 'avg_latency_ms',
       key: 'avg_latency_ms',
       align: 'right' as const,
@@ -229,35 +263,35 @@ export default function StatsPage() {
           description="Slice aggregate performance by time and placement, compare DSP behavior, and inspect trend movement without leaving the admin."
           extra={
             <Button icon={<ReloadOutlined />} onClick={load}>
-              Refresh
+              {t('common.refresh')}
             </Button>
           }
         />
 
         <SurfaceNote
-          title="Recommended use"
-          text="Use this view after changing strategy, source configuration, or DSP settings to verify fill-rate movement, price quality, and latency impact."
+          title={t('stats.recommendedUse')}
+          text={t('stats.recommendedText')}
           tone="default"
         />
 
         <PageCard>
-          <CardHeader title="Filters" sub="Refine analytics by time window and monitor refresh cadence." />
+          <CardHeader title={t('stats.filters')} sub={t('stats.filtersSub')} />
           <div style={{ padding: '18px 20px' }}>
             <Space wrap size={12}>
               <RangePicker
                 showTime
                 value={timeRange as any}
                 onChange={(value) => setTimeRange(value as any)}
-                placeholder={['开始时间', '结束时间']}
+                placeholder={[t('stats.startTime'), t('stats.endTime')]}
               />
               <Button type="primary" onClick={load} icon={<ReloadOutlined />}>
-                查询
+                {t('stats.query')}
               </Button>
               <Button onClick={() => { setTimeRange(null); setPlacementFilter('') }}>
-                重置
+                {t('common.reset')}
               </Button>
               <Space>
-                <Text type="secondary" style={{ fontSize: 13 }}>自动刷新（30s）</Text>
+                <Text type="secondary" style={{ fontSize: 13 }}>{t('stats.autoRefresh')}</Text>
                 <Switch size="small" checked={autoRefresh} onChange={setAutoRefresh} checkedChildren={<SyncOutlined spin />} />
               </Space>
             </Space>
@@ -265,18 +299,35 @@ export default function StatsPage() {
         </PageCard>
 
         <Row gutter={[16, 16]}>
-          {[
-            { title: '总竞价请求', value: totalRequests, color: '#1677ff' },
-            { title: '成功竞价', value: totalSuccess, color: '#12b981' },
-            { title: '平均填充率', value: `${averageFillRate.toFixed(1)}%`, color: '#f59e0b' },
-            { title: '平均胜出价', value: `$${averageCpm.toFixed(4)}`, color: '#7c3aed' },
-          ].map((item) => (
-            <Col xs={24} sm={12} lg={6} key={item.title}>
-              <Card style={{ borderRadius: 16, border: '1px solid #e7ebf3', boxShadow: '0 10px 30px rgba(15, 23, 42, 0.06)', textAlign: 'center' }}>
-                <Statistic title={item.title} value={item.value} valueStyle={{ color: item.color, fontWeight: 700 }} />
-              </Card>
-            </Col>
-          ))}
+          <Col xs={24} sm={12} lg={6}>
+            <StatCard
+              label={t('stats.totalRequests')}
+              value={totalRequests.toLocaleString()}
+              accent="#1677ff"
+              sub={`${totalSuccess.toLocaleString()} ${t('stats.success')}`}
+            />
+          </Col>
+          <Col xs={24} sm={12} lg={6}>
+            <StatCard
+              label={t('stats.successBids')}
+              value={totalSuccess.toLocaleString()}
+              accent="#12b981"
+            />
+          </Col>
+          <Col xs={24} sm={12} lg={6}>
+            <StatCard
+              label={t('stats.avgFillRate')}
+              value={`${averageFillRate.toFixed(1)}%`}
+              accent="#f59e0b"
+            />
+          </Col>
+          <Col xs={24} sm={12} lg={6}>
+            <StatCard
+              label={t('stats.avgWinCpm')}
+              value={`$${averageCpm.toFixed(4)}`}
+              accent="#7c3aed"
+            />
+          </Col>
         </Row>
 
         {timeSeries.length > 0 ? (
@@ -285,18 +336,18 @@ export default function StatsPage() {
               title={
                 <Space>
                   <LineChartOutlined style={{ color: '#1677ff' }} />
-                  <span>竞价趋势（按小时）</span>
+                  <span>{t('stats.trendChart')}</span>
                 </Space>
               }
               sub="Overlay request volume and fill rate to spot operational shifts quickly."
             />
             <div style={{ padding: '18px 20px' }}>
-              <SimpleLineChart data={timeSeries} height={150} />
+              <SimpleLineChart data={timeSeries} height={150} t={t} />
               <div style={{ marginTop: 12, display: 'flex', gap: 20, flexWrap: 'wrap' }}>
                 {timeSeries.slice(-5).reverse().map((bucket) => (
                   <div key={bucket.hour} style={{ fontSize: 12, color: '#98a2b3' }}>
                     <Text type="secondary">{bucket.hour}</Text>
-                    <Text style={{ marginLeft: 6 }}>{bucket.total_requests} 次</Text>
+                    <Text style={{ marginLeft: 6 }}>{bucket.total_requests}</Text>
                     <Text style={{ marginLeft: 6, color: '#12b981' }}>{bucket.fill_rate.toFixed(0)}%</Text>
                   </div>
                 ))}
@@ -306,7 +357,7 @@ export default function StatsPage() {
         ) : null}
 
         <PageCard>
-          <CardHeader title="Detailed Breakdown" sub="Switch between ad-unit and DSP views for a denser inspection surface." />
+          <CardHeader title={t('stats.detailedBreakdown')} sub={t('stats.detailedSub')} />
           <div style={{ padding: '0 4px 8px' }}>
             <Tabs
               items={[
@@ -315,7 +366,7 @@ export default function StatsPage() {
                   label: (
                     <Space>
                       <RiseOutlined />
-                      广告位维度
+                      {t('stats.overviewTab')}
                     </Space>
                   ),
                   children: (
@@ -325,7 +376,7 @@ export default function StatsPage() {
                       rowKey="placement_id"
                       pagination={false}
                       size="small"
-                      locale={{ emptyText: '暂无数据' }}
+                      locale={{ emptyText: t('stats.noData') }}
                     />
                   ),
                 },
@@ -334,7 +385,7 @@ export default function StatsPage() {
                   label: (
                     <Space>
                       <TeamOutlined />
-                      DSP 维度
+                      {t('stats.dspTab')}
                     </Space>
                   ),
                   children: (
@@ -344,7 +395,7 @@ export default function StatsPage() {
                       rowKey="dsp_id"
                       pagination={false}
                       size="small"
-                      locale={{ emptyText: '暂无数据' }}
+                      locale={{ emptyText: t('stats.noData') }}
                     />
                   ),
                 },

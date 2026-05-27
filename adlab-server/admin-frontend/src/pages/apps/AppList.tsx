@@ -8,6 +8,7 @@ import {
   Divider,
   Drawer,
   Empty,
+  message,
   Tag,
   Row,
   Space,
@@ -27,9 +28,11 @@ import {
   ReloadOutlined,
 } from '@ant-design/icons'
 import { deleteApp, getAppWithPlacements, listApps } from '../../api/apps'
-import type { App } from '../../types'
+import { deleteAppNetworkConfig, listAppNetworkConfigs } from '../../api/appNetworkConfigs'
+import type { App, AppNetworkConfig } from '../../types'
 import StatusTag from '../../components/StatusTag'
 import AppForm from './AppForm'
+import AppNetworkConfigForm from './AppNetworkConfigForm'
 import { msg } from '../../hooks/useMessage'
 import { CardHeader, IdTag, PageCard, SectionIntro, SurfaceNote } from '../../components/ui'
 
@@ -68,6 +71,8 @@ export default function AppList() {
   const [editing, setEditing] = useState<App | null>(null)
   const [detailOpen, setDetailOpen] = useState(false)
   const [detailApp, setDetailApp] = useState<App | null>(null)
+  const [networkConfigFormOpen, setNetworkConfigFormOpen] = useState(false)
+  const [editingNetworkConfig, setEditingNetworkConfig] = useState<AppNetworkConfig | null>(null)
 
   const load = () => {
     setLoading(true)
@@ -91,8 +96,25 @@ export default function AppList() {
 
   const openDetail = async (app: App) => {
     const full = await getAppWithPlacements(app.app_id)
+    const networkConfigs = await listAppNetworkConfigs(app.app_id)
+    full.app_network_configs = networkConfigs
     setDetailApp(full)
     setDetailOpen(true)
+  }
+
+  const refreshDetail = async () => {
+    if (!detailApp) return
+    const full = await getAppWithPlacements(detailApp.app_id)
+    const networkConfigs = await listAppNetworkConfigs(detailApp.app_id)
+    full.app_network_configs = networkConfigs
+    setDetailApp(full)
+  }
+
+  const handleDeleteNetworkConfig = async (config: AppNetworkConfig) => {
+    if (!detailApp || !config.id) return
+    await deleteAppNetworkConfig(detailApp.app_id, config.id)
+    msg.success('网络配置已删除')
+    await refreshDetail()
   }
 
   const renderCards = () => (
@@ -468,9 +490,124 @@ export default function AppList() {
               ]}
               locale={{ emptyText: '该应用暂无广告位' }}
             />
+
+            <Card
+              size="small"
+              style={{
+                marginTop: 16,
+                borderRadius: 14,
+                background: 'linear-gradient(160deg, rgba(255,255,255,0.8), rgba(248,250,252,0.56))',
+                border: '1px solid rgba(231,235,243,0.9)',
+                boxShadow: '0 10px 20px rgba(15,23,42,0.04)',
+              }}
+            >
+              <CardHeader
+                title="应用级网络配置"
+                sub="管理 SDK 初始化所需的广告网络参数。"
+                extra={
+                  <Button
+                    size="small"
+                    type="primary"
+                    icon={<PlusOutlined />}
+                    onClick={() => {
+                      setEditingNetworkConfig(null)
+                      setNetworkConfigFormOpen(true)
+                    }}
+                  >
+                    新建网络配置
+                  </Button>
+                }
+              />
+              <Table
+                style={{ marginTop: 12 }}
+                dataSource={detailApp.app_network_configs ?? []}
+                rowKey="id"
+                pagination={false}
+                columns={[
+                  {
+                    title: '网络',
+                    dataIndex: 'network_type',
+                    key: 'network_type',
+                    render: (value: string) => <Tag>{value}</Tag>,
+                  },
+                  {
+                    title: '平台',
+                    dataIndex: 'platform',
+                    key: 'platform',
+                    render: (value: string) => <Tag color="blue">{value}</Tag>,
+                  },
+                  {
+                    title: 'Adapter',
+                    dataIndex: 'adapter_class',
+                    key: 'adapter_class',
+                    render: (value: string) => value || <Text type="secondary">默认</Text>,
+                  },
+                  {
+                    title: '初始化参数',
+                    dataIndex: 'init_params_json',
+                    key: 'init_params_json',
+                    render: (value: string) => (
+                      value ? (
+                        <Text code style={{ fontSize: 11 }}>
+                          {value.length > 40 ? `${value.slice(0, 40)}…` : value}
+                        </Text>
+                      ) : (
+                        <Text type="secondary">未配置</Text>
+                      )
+                    ),
+                  },
+                  {
+                    title: '状态',
+                    dataIndex: 'status',
+                    key: 'status',
+                    render: (value: string) => <StatusTag status={value} />,
+                  },
+                  {
+                    title: '',
+                    key: 'action',
+                    render: (_: unknown, row: AppNetworkConfig) => (
+                      <Space size={4}>
+                        <Button
+                          size="small"
+                          type="text"
+                          icon={<EditOutlined />}
+                          onClick={() => {
+                            setEditingNetworkConfig(row)
+                            setNetworkConfigFormOpen(true)
+                          }}
+                        />
+                        <Button
+                          size="small"
+                          type="text"
+                          danger
+                          onClick={() => handleDeleteNetworkConfig(row)}
+                        >
+                          ×
+                        </Button>
+                      </Space>
+                    ),
+                  },
+                ]}
+                locale={{ emptyText: '该应用暂无应用级网络配置' }}
+              />
+            </Card>
           </>
         ) : null}
       </Drawer>
+
+      {detailApp ? (
+        <AppNetworkConfigForm
+          appId={detailApp.app_id}
+          open={networkConfigFormOpen}
+          initial={editingNetworkConfig}
+          onClose={() => setNetworkConfigFormOpen(false)}
+          onSuccess={async () => {
+            setNetworkConfigFormOpen(false)
+            setEditingNetworkConfig(null)
+            await refreshDetail()
+          }}
+        />
+      ) : null}
     </div>
   )
 }

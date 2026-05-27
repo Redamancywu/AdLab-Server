@@ -275,3 +275,148 @@ func TestMultiSourceBindingProperty(t *testing.T) {
 		}
 	}
 }
+
+// TestPlacementBindingStoresInstanceFields 验证绑定记录能持久化实例级字段
+// Validates: Requirements 2.2
+func TestPlacementBindingStoresInstanceFields(t *testing.T) {
+	db := setupTestDB(t)
+	placementRepo := repository.NewPlacementRepository(db)
+	sourceRepo := repository.NewAdSourceRepository(db)
+
+	placement := &model.Placement{
+		PlacementID: "plc_instance_fields",
+		Name:        "Instance Fields Placement",
+		AdType:      "rewarded_video",
+		Status:      "active",
+	}
+	if err := placementRepo.Create(placement); err != nil {
+		t.Fatalf("创建 Placement 失败: %v", err)
+	}
+
+	source := &model.AdSource{
+		SourceID:    "src_instance_fields",
+		Name:        "Instance Fields Source",
+		BidMode:     "waterfall",
+		Priority:    10,
+		FloorPrice:  0,
+		TimeoutMs:   200,
+		Status:      "active",
+		NetworkType: "admob",
+	}
+	if err := sourceRepo.Create(source); err != nil {
+		t.Fatalf("创建 AdSource 失败: %v", err)
+	}
+
+	err := placementRepo.BindSourceDetailed(repository.BindSourceParams{
+		PlacementID:        placement.PlacementID,
+		SourceID:           source.SourceID,
+		InstanceID:         "ins_reward_admob_01",
+		InstanceName:       "Rewarded AdMob Main",
+		AdUnitID:           "ca-app-pub-xxx/yyy",
+		TimeoutMsOverride:  1200,
+		FloorPriceOverride: 1.25,
+		LoadParamsJSON:     `{"orientation":"portrait"}`,
+		Status:             "active",
+	})
+	if err != nil {
+		t.Fatalf("BindSourceDetailed 失败: %v", err)
+	}
+
+	bindings, err := placementRepo.FindBindings(placement.PlacementID)
+	if err != nil {
+		t.Fatalf("查询绑定失败: %v", err)
+	}
+	if len(bindings) != 1 {
+		t.Fatalf("期望 1 条绑定，实际 %d", len(bindings))
+	}
+	if bindings[0].InstanceID != "ins_reward_admob_01" {
+		t.Fatalf("InstanceID 不一致: 实际 %q", bindings[0].InstanceID)
+	}
+	if bindings[0].InstanceName != "Rewarded AdMob Main" {
+		t.Fatalf("InstanceName 不一致: 实际 %q", bindings[0].InstanceName)
+	}
+	if bindings[0].LoadParamsJSON != `{"orientation":"portrait"}` {
+		t.Fatalf("LoadParamsJSON 不一致: 实际 %q", bindings[0].LoadParamsJSON)
+	}
+	if bindings[0].TimeoutMsOverride != 1200 {
+		t.Fatalf("TimeoutMsOverride 不一致: 实际 %d", bindings[0].TimeoutMsOverride)
+	}
+}
+
+// TestUpdateBindingByInstanceID 验证按实例 ID 更新绑定记录
+// Validates: Requirements 2.2
+func TestUpdateBindingByInstanceID(t *testing.T) {
+	db := setupTestDB(t)
+	placementRepo := repository.NewPlacementRepository(db)
+	sourceRepo := repository.NewAdSourceRepository(db)
+
+	placement := &model.Placement{
+		PlacementID: "plc_update_binding",
+		Name:        "Update Binding Placement",
+		AdType:      "rewarded_video",
+		Status:      "active",
+	}
+	if err := placementRepo.Create(placement); err != nil {
+		t.Fatalf("创建 Placement 失败: %v", err)
+	}
+
+	source := &model.AdSource{
+		SourceID:    "src_update_binding",
+		Name:        "Update Binding Source",
+		BidMode:     "waterfall",
+		Priority:    10,
+		FloorPrice:  0,
+		TimeoutMs:   200,
+		Status:      "active",
+		NetworkType: "admob",
+	}
+	if err := sourceRepo.Create(source); err != nil {
+		t.Fatalf("创建 AdSource 失败: %v", err)
+	}
+
+	if err := placementRepo.BindSourceDetailed(repository.BindSourceParams{
+		PlacementID:        placement.PlacementID,
+		SourceID:           source.SourceID,
+		InstanceID:         "ins_update_binding",
+		InstanceName:       "Initial Name",
+		AdUnitID:           "ca-app-pub-old/slot",
+		TimeoutMsOverride:  1000,
+		FloorPriceOverride: 1.1,
+		Status:             "active",
+	}); err != nil {
+		t.Fatalf("初始化绑定失败: %v", err)
+	}
+
+	if err := placementRepo.UpdateBindingByInstanceID("ins_update_binding", repository.BindSourceParams{
+		PlacementID:        placement.PlacementID,
+		SourceID:           source.SourceID,
+		InstanceName:       "Updated Name",
+		AdUnitID:           "ca-app-pub-new/slot",
+		TimeoutMsOverride:  1600,
+		FloorPriceOverride: 2.2,
+		LoadParamsJSON:     `{"orientation":"landscape"}`,
+		Status:             "active",
+	}); err != nil {
+		t.Fatalf("更新绑定失败: %v", err)
+	}
+
+	bindings, err := placementRepo.FindBindings(placement.PlacementID)
+	if err != nil {
+		t.Fatalf("查询绑定失败: %v", err)
+	}
+	if len(bindings) != 1 {
+		t.Fatalf("期望 1 条绑定，实际 %d", len(bindings))
+	}
+	if bindings[0].InstanceName != "Updated Name" {
+		t.Fatalf("InstanceName 未更新: %q", bindings[0].InstanceName)
+	}
+	if bindings[0].AdUnitID != "ca-app-pub-new/slot" {
+		t.Fatalf("AdUnitID 未更新: %q", bindings[0].AdUnitID)
+	}
+	if bindings[0].TimeoutMsOverride != 1600 {
+		t.Fatalf("TimeoutMsOverride 未更新: %d", bindings[0].TimeoutMsOverride)
+	}
+	if bindings[0].LoadParamsJSON != `{"orientation":"landscape"}` {
+		t.Fatalf("LoadParamsJSON 未更新: %q", bindings[0].LoadParamsJSON)
+	}
+}

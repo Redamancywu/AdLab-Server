@@ -17,17 +17,15 @@ export function PageCard({
 }) {
   return (
     <section
+      className="page-card"
       style={{
-        background: 'transparent',
-        borderRadius: 20,
-        border: 'none',
-        boxShadow: 'none',
         overflow: 'hidden',
         ...style,
       }}
     >
       <div
         style={{
+          padding: '2px', // 防止子元素内容切边
           ...bodyStyle,
         }}
       >

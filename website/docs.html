@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AeroBid 开发者文档中心 | 商业级聚合广告变现底层</title>
+  <meta name="description" content="AeroBid 聚合广告变现平台开发者文档，包含 iOS Swift SDK, Android Kotlin SDK, Web JS SDK 及 S2S REST API 的高保真接入指南与开发接入文档。">
+
+  <!-- Fonts -->
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Fira+Code:wght@400;500&display=swap">
+
+  <!-- Marked Markdown Parser (CDN) -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+  <style>
+    :root {
+      --font-heading: 'SF Pro Display', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-body: 'SF Pro Text', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: 'SF Mono', 'Fira Code', monospace;
+
+      /* Apple Pro aesthetics palette */
+      --bg-black: #000000;
+      --bg-dark: #090d16;
+      --bg-slate: #121b2d;
+      --bg-card: #161617;
+      --bg-card-hover: #1c1c1e;
+      --primary: #0071e3;
+      --primary-hover: #147ce5;
+      --text-white: #ffffff;
+      --text-primary: #f5f5f7;
+      --text-secondary: #86868b;
+      --text-muted: #424245;
+      --border-color: #2d2d30;
+      --success: #30d158;
+
+      --transition-apple: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    body {
+      background-color: var(--bg-black);
+      color: var(--text-primary);
+      font-family: var(--font-body);
+      min-height: 100vh;
+      overflow-x: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Webkit scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: var(--bg-black);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #333336;
+      border-radius: 99px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #424245;
+    }
+
+    /* Premium Header */
+    .docs-header {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 64px;
+      background: rgba(0, 0, 0, 0.72);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border-color);
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 40px;
+    }
+
+    .header-logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+      color: var(--text-white);
+      font-weight: 700;
+      font-size: 1.15rem;
+      letter-spacing: -0.5px;
+      transition: var(--transition-apple);
+    }
+    .header-logo:hover {
+      opacity: 0.9;
+    }
+    .logo-icon {
+      color: var(--primary);
+    }
+
+    .header-nav {
+      display: flex;
+      align-items: center;
+      gap: 28px;
+    }
+
+    .nav-link {
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-size: 0.9rem;
+      font-weight: 500;
+      transition: var(--transition-apple);
+    }
+    .nav-link:hover, .nav-link.active {
+      color: var(--text-white);
+    }
+
+    .cta-button {
+      background: var(--text-white);
+      color: var(--bg-black);
+      border: none;
+      padding: 8px 18px;
+      border-radius: 99px;
+      font-weight: 600;
+      font-size: 0.85rem;
+      cursor: pointer;
+      text-decoration: none;
+      transition: var(--transition-apple);
+    }
+    .cta-button:hover {
+      background: rgba(255, 255, 255, 0.9);
+      transform: translateY(-1px);
+    }
+
+    /* Main Container layout */
+    .docs-container {
+      margin-top: 64px;
+      display: flex;
+      flex: 1;
+      width: 100%;
+      max-width: 1440px;
+      margin-left: auto;
+      margin-right: auto;
+      position: relative;
+      min-width: 0;
+    }
+
+    /* Sidebar Navigation */
+    .docs-sidebar {
+      width: 280px;
+      border-right: 1px solid var(--border-color);
+      padding: 40px 24px;
+      position: fixed;
+      top: 64px;
+      bottom: 0;
+      overflow-y: auto;
+      background: var(--bg-black);
+      z-index: 10;
+    }
+
+    .sidebar-title {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+      color: var(--text-secondary);
+      font-weight: 700;
+      margin-bottom: 20px;
+      padding-left: 12px;
+    }
+
+    .sidebar-menu {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .sidebar-nav-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      border-radius: 8px;
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-size: 0.9rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: var(--transition-apple);
+      background: transparent;
+    }
+    .sidebar-nav-item:hover {
+      color: var(--text-white);
+      background: rgba(255, 255, 255, 0.04);
+    }
+    .sidebar-nav-item.active {
+      color: var(--text-white);
+      background: rgba(0, 113, 227, 0.15);
+      border: 1px solid rgba(0, 113, 227, 0.3);
+      font-weight: 600;
+    }
+
+    .sidebar-nav-item svg {
+      width: 16px;
+      height: 16px;
+      flex-shrink: 0;
+    }
+
+    /* Reader Main Panel */
+    .docs-reader {
+      flex: 1;
+      margin-left: 280px;
+      padding: 56px 80px 80px 80px;
+      max-width: 960px;
+      position: relative;
+      min-width: 0;
+    }
+
+    /* Document Reader Header */
+    .reader-header {
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 24px;
+      margin-bottom: 36px;
+      position: relative;
+    }
+
+    .eyebrow {
+      font-size: 0.8rem;
+      color: var(--primary);
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      font-weight: 700;
+      display: block;
+      margin-bottom: 8px;
+    }
+
+    .main-title {
+      font-size: 2.5rem;
+      font-weight: 700;
+      color: var(--text-white);
+      letter-spacing: -1px;
+      margin-bottom: 8px;
+    }
+
+    .update-time {
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+    }
+
+    /* Markdown Compiled Output Styles */
+    .markdown-body {
+      line-height: 1.8;
+      font-size: 1rem;
+      color: #b3b9c6;
+    }
+    .markdown-body h1, .markdown-body h2, .markdown-body h3, .markdown-body h4 {
+      color: var(--text-white);
+      font-weight: 600;
+      margin-top: 36px;
+      margin-bottom: 16px;
+      letter-spacing: -0.5px;
+    }
+    .markdown-body h1 {
+      font-size: 1.8rem;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 8px;
+    }
+    .markdown-body h2 {
+      font-size: 1.4rem;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      padding-bottom: 6px;
+    }
+    .markdown-body h3 {
+      font-size: 1.15rem;
+    }
+    .markdown-body p {
+      margin-bottom: 20px;
+    }
+    .markdown-body a {
+      color: var(--primary);
+      text-decoration: none;
+      transition: var(--transition-apple);
+    }
+    .markdown-body a:hover {
+      color: #3fa1ff;
+      text-decoration: underline;
+    }
+    .markdown-body code {
+      font-family: var(--font-mono);
+      background: rgba(255, 255, 255, 0.08);
+      color: #f43f5e;
+      padding: 3px 6px;
+      border-radius: 4px;
+      font-size: 0.88rem;
+    }
+    .markdown-body pre {
+      background: var(--bg-dark);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 20px;
+      overflow-x: auto;
+      max-width: 100%;
+      margin-bottom: 24px;
+      position: relative;
+    }
+    .markdown-body pre code {
+      background: none;
+      color: #e2e8f0;
+      padding: 0;
+      border-radius: 0;
+      font-size: 0.88rem;
+      line-height: 1.6;
+    }
+    .markdown-body ul, .markdown-body ol {
+      margin-bottom: 20px;
+      padding-left: 24px;
+    }
+    .markdown-body li {
+      margin-bottom: 8px;
+    }
+    .markdown-body blockquote {
+      margin: 24px 0;
+      padding: 0 20px;
+      color: var(--text-secondary);
+      border-left: 4px solid var(--primary);
+      background: rgba(255,255,255,0.02);
+      border-radius: 0 8px 8px 0;
+      padding: 12px 20px;
+    }
+    .markdown-body table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 24px;
+    }
+    .markdown-body th, .markdown-body td {
+      border: 1px solid var(--border-color);
+      padding: 12px 16px;
+      text-align: left;
+    }
+    .markdown-body th {
+      background: rgba(255,255,255,0.04);
+      color: var(--text-white);
+      font-weight: 600;
+    }
+
+    /* Ambient Metal Glows */
+    .ambient-orb {
+      position: absolute;
+      top: 15%;
+      right: 5%;
+      width: 400px;
+      height: 400px;
+      background: radial-gradient(circle, rgba(0, 113, 227, 0.08) 0%, transparent 70%);
+      filter: blur(80px);
+      z-index: -1;
+      pointer-events: none;
+    }
+
+    /* Hidden Fallback Markdown Elements */
+    .hidden-fallback {
+      display: none;
+    }
+
+    /* Responsive Grid */
+    @media (max-width: 1024px) {
+      .docs-sidebar {
+        width: 240px;
+      }
+      .docs-reader {
+        margin-left: 240px;
+        padding: 40px;
+      }
+    }
+
+    @media (max-width: 768px) {
+      .docs-sidebar {
+        position: relative;
+        width: 100%;
+        height: auto;
+        border-right: none;
+        border-bottom: 1px solid var(--border-color);
+        top: 0;
+        padding: 24px 20px;
+      }
+      .docs-container {
+        flex-direction: column;
+      }
+      .docs-reader {
+        margin-left: 0;
+        padding: 32px 20px;
+      }
+      .docs-header {
+        padding: 0 20px;
+      }
+      .header-nav {
+        display: none; /* Hide middle links on mobile */
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Premium Glass Header -->
+  <header class="docs-header">
+    <a href="index.html" class="header-logo">
+      <svg class="logo-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+      </svg>
+      <span>AeroBid Developer</span>
+    </a>
+
+    <nav class="header-nav">
+      <a href="index.html" class="nav-link">官网主页</a>
+      <a href="#" class="nav-link active">文档中心</a>
+      <a href="http://localhost:3000" target="_blank" class="nav-link">开发者控制台</a>
+      <a href="index.html#features" class="nav-link">技术架构</a>
+    </nav>
+
+    <a href="index.html" class="cta-button">返回主页</a>
+  </header>
+
+  <!-- Docs Layout -->
+  <div class="docs-container">
+    <div class="ambient-orb"></div>
+
+    <!-- Sidebar Menu -->
+    <aside class="docs-sidebar">
+      <h3 class="sidebar-title">开发集成 SDK</h3>
+      <ul class="sidebar-menu">
+        <li>
+          <a class="sidebar-nav-item active" data-key="ios" onclick="loadDocument('ios')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+            </svg>
+            <span>iOS Swift SDK</span>
+          </a>
+        </li>
+        <li>
+          <a class="sidebar-nav-item" data-key="android" onclick="loadDocument('android')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect>
+              <line x1="7" y1="2" x2="7" y2="22"></line>
+              <line x1="17" y1="2" x2="17" y2="22"></line>
+              <line x1="2" y1="12" x2="22" y2="12"></line>
+            </svg>
+            <span>Android Kotlin SDK</span>
+          </a>
+        </li>
+        <li>
+          <a class="sidebar-nav-item" data-key="web" onclick="loadDocument('web')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="12 2 2 22 22 22"></polygon>
+            </svg>
+            <span>Web JS SDK</span>
+          </a>
+        </li>
+        <li>
+          <a class="sidebar-nav-item" data-key="api" onclick="loadDocument('api')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+              <line x1="16" y1="13" x2="8" y2="13"></line>
+              <line x1="16" y1="17" x2="8" y2="17"></line>
+              <polyline points="10 9 9 9 8 9"></polyline>
+            </svg>
+            <span>S2S REST API 规范</span>
+          </a>
+        </li>
+      </ul>
+    </aside>
+
+    <!-- Main Reader Panel -->
+    <main class="docs-reader">
+      <article class="reader-header">
+        <span class="eyebrow">AeroBid Integration Portal</span>
+        <h1 class="main-title" id="docs-main-title">iOS SDK 集成指南</h1>
+        <div class="update-time" id="docs-update-time">载入中...</div>
+      </article>
+
+      <section class="markdown-body" id="docs-body-content" style="transition: opacity 0.2s ease;">
+        <!-- Compiled Markdown will be injected here -->
+      </section>
+    </main>
+  </div>
+
+  <!-- Hidden Fallback Markdown scripts (Safest way to completely avoid any JS SyntaxErrors or backtick escaping bugs) -->
+  <script type="text/markdown" id="fallback-ios" class="hidden-fallback">
+## iOS SDK 集成指南
+
+AeroBid iOS SDK 是一个用 Swift 编写的超轻量级变现聚合库，旨在无缝调度本地 S2S / C2S 广告源。
+
+### 1. 安装 SDK 支持
+在您的 Xcode 项目中，推荐使用 Swift Package Manager (SPM) 引入包：
+```swift
+https://github.com/Redamancywu/AeroBid-iOS-SDK.git
+```
+
+### 2. 初始化 SDK 核心
+在您的 AppDelegate.swift 文件中，引入模块并在应用启动时注册授权密钥：
+```swift
+import AeroBidSDK
+
+func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: ...) -> Bool {
+    // 初始化 AeroBid 并触发预分配缓存
+    AeroBidSDK.shared.initialize(
+        appKey: "ab_prod_8f9c0e4",
+        appSecret: "sec_7d2f9b8c"
+    ) { success in
+        print("AeroBid SDK 状态: \(success ? "就绪" : "异常")")
+    }
+    return true
+}
+```
+
+### 3. 载入并播放插屏视频 (Interstitial)
+在需要触发变现广告的控制器中，调用以下 API 加载并展示胜出广告：
+```swift
+class HomeViewController: UIViewController {
+    var interstitial: AeroBidInterstitial?
+
+    func loadAdPressed() {
+        // 指定后台配好的 Placement ID
+        interstitial = AeroBidInterstitial(placementId: "d1f3a5b7c9e1f201")
+
+        interstitial?.loadAd { [weak self] result in
+            switch result {
+            case .success(let ad):
+                // 竞价比对胜出后，调用原生播放器渲染 VAST 视频
+                ad.show(from: self)
+                print("最高胜出竞价: $\(ad.cpm) USD, 渠道: \(ad.dspName)")
+            case .failure(let error):
+                print("无广告填充或网络超时: \(error.localizedDescription)")
+            }
+        }
+    }
+}
+```
+  </script>
+
+  <script type="text/markdown" id="fallback-android" class="hidden-fallback">
+## Android SDK 集成指南
+
+AeroBid Android SDK 专为 Kotlin/Java 开发设计，封装了高效的 HTTP 请求池与本地 VAST 播放追踪组件。
+
+### 1. 添加 Gradle 依赖
+在项目根目录 build.gradle 中注册 Maven 仓库地址：
+```gradle
+allprojects {
+    repositories {
+        maven { url 'https://maven.aerobid.io/repository/public/' }
+    }
+}
+```
+在模块 app/build.gradle 中添加依赖项：
+```gradle
+dependencies {
+    implementation 'com.aerobid.sdk:core:1.2.0'
+}
+```
+
+### 2. SDK 全局初始化
+在您的 Application 类或主 Activity 启动时，拉起引擎：
+```kotlin
+import com.aerobid.sdk.AeroBid
+
+class MainApplication : Application() {
+    override fun onCreate() {
+        super.onCreate()
+        // 一键拉起后台长连接与预请求
+        AeroBid.initialize(
+            context = this,
+            appKey = "ab_prod_8f9c0e4",
+            appSecret = "sec_7d2f9b8c"
+        )
+    }
+}
+```
+
+### 3. 异步载入激励视频
+```kotlin
+val rewarded = AeroBidRewardedAd(this, "d1f3a5b7c9e1f201")
+rewarded.load(object : AeroBidAdListener {
+    override fun onAdLoaded(ad: AeroBidAd) {
+        // 触发标准 VAST 4.2 规格激励视频播放
+        rewarded.show()
+    }
+
+    override fun onAdFailed(error: AeroBidError) {
+        Log.e("AeroBid", "变现无填充: ${error.message}")
+    }
+})
+```
+  </script>
+
+  <template id="fallback-web">
+## Web JS SDK 接入指南
+
+AeroBid Web SDK 支持现代化的浏览器架构变现，可高效分发 Web 端插屏、视频及横幅广告位。
+
+### 1. 包引入
+使用包管理工具安装 ESM 模块：
+```bash
+npm install @aerobid/web-sdk
+```
+或者在网页 HTML 中直接导入 CDN 库文件：
+```html
+<script src="https://cdn.aerobid.io/sdk/web-sdk.min.js"></script>
+```
+
+### 2. 创建比价实例
+```javascript
+import { AeroBidEngine } from '@aerobid/web-sdk';
+
+const client = new AeroBidEngine({
+  appKey: 'ab_prod_8f9c0e4',
+  endpoint: 'http://localhost:8080/api/v1'
+});
+```
+
+### 3. 请求并渲染 DOM 横幅广告
+```javascript
+client.requestBid({
+  placementId: 'plc_web_banner',
+  sizes: [[300, 250]]
+}).then(ad => {
+  // 将服务端竞价胜出的 HTML 创意直接渲染在插槽中
+  document.getElementById('ad-slot').innerHTML = ad.creativeHTML;
+  console.log(`渲染成功! 胜出单价: ${ad.cpm} CPM, 来源: ${ad.dspId}`);
+}).catch(err => {
+  console.warn('本轮竞价无填充响应', err);
+});
+```
+  </template>
+
+  <script type="text/markdown" id="fallback-api" class="hidden-fallback">
+## REST API 服务端对接规范
+
+直接通过服务端接口（S2S）调用 AeroBid 比价核心，适合需要私有化定制接入的高级程序化买家与聚合中台。
+
+### 1. 请求广告核心路由
+```text
+POST  http://localhost:8080/api/v1/ad/request
+```
+
+### 2. JSON 请求载荷格式
+```json
+{
+  "placement_id": "d1f3a5b7c9e1f201",
+  "device": {
+    "platform": "ios",
+    "os_version": "17.0",
+    "device_model": "iPhone15,2",
+    "language": "zh-CN"
+  }
+}
+```
+
+### 3. 成功响应结构 (200 OK)
+如果 S2S 比价有正向响应，服务端会返回符合比价信息的统一实体结构，包含对应的 VAST 视频 XML 素材体：
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "request_id": "req_bf0214a1c",
+    "placement_id": "d1f3a5b7c9e1f201",
+    "ad_type": "rewarded_video",
+    "bid_mode": "s2s",
+    "winner_dsp_id": "applovin",
+    "winner_price": 8.65,
+    "is_mock": false,
+    "vast_xml": "<VAST version=\"4.2\">...</VAST>"
+  }
+}
+```
+  </script>
+
+  <!-- JS Logic script -->
+  <script>
+    const API_BASE = 'http://localhost:8080/api/v1';
+
+    function getDefaultTitle(key) {
+      switch(key) {
+        case 'ios': return 'iOS SDK 集成指南';
+        case 'android': return 'Android SDK 集成指南';
+        case 'web': return 'Web JS SDK 接入指南';
+        case 'api': return 'REST API 对接规范';
+        default: return '开发者文档';
+      }
+    }
+
+    // Dynamic Loader Function with Fallback
+    async function loadDocument(key) {
+      // Update sidebar nav active state
+      document.querySelectorAll('.sidebar-nav-item').forEach(el => {
+        if (el.getAttribute('data-key') === key) {
+          el.classList.add('active');
+        } else {
+          el.classList.remove('active');
+        }
+      });
+
+      const titleArea = document.getElementById('docs-main-title');
+      const contentArea = document.getElementById('docs-body-content');
+      const updateTimeArea = document.getElementById('docs-update-time');
+
+      contentArea.style.opacity = '0.4';
+
+      try {
+        const response = await fetch(`${API_BASE}/docs/${key}`);
+        if (response.ok) {
+          const result = await response.json();
+          if (result.code === 200 && result.data) {
+            const doc = result.data;
+            titleArea.textContent = doc.title;
+            contentArea.innerHTML = marked.parse(doc.content);
+            if (doc.updated_at) {
+              const date = new Date(doc.updated_at);
+              updateTimeArea.textContent = `最后更新: ${date.toLocaleString('zh-CN')} (同步自管理后台)`;
+            } else {
+              updateTimeArea.textContent = '实时同步最新版';
+            }
+            contentArea.style.opacity = '1';
+            return;
+          }
+        }
+      } catch (err) {
+        console.warn(`[AeroBid Docs] Backend offline, falling back to local cached doc.`, err);
+      }
+
+      // Fallback from hidden DOM markdown block (supports both <script> and <template>)
+      const fallbackEl = document.getElementById(`fallback-${key}`);
+      if (fallbackEl) {
+        let defaultDoc;
+        if (fallbackEl.tagName === 'TEMPLATE') {
+          // <template> stores content in a DocumentFragment; extract text via a temp div
+          const tmp = document.createElement('div');
+          tmp.appendChild(fallbackEl.content.cloneNode(true));
+          defaultDoc = tmp.textContent.trim();
+        } else {
+          defaultDoc = fallbackEl.textContent.trim();
+        }
+        titleArea.textContent = getDefaultTitle(key);
+        contentArea.innerHTML = marked.parse(defaultDoc);
+        updateTimeArea.textContent = '本地高保真预置文档 (服务端未连接)';
+      } else {
+        contentArea.innerHTML = '<p style="color: #64748b; font-style: italic;">文档正在载入中...</p>';
+      }
+      contentArea.style.opacity = '1';
+    }
+
+    // Initialize with first tab
+    window.addEventListener('DOMContentLoaded', () => {
+      loadDocument('ios');
+    });
+  </script>
+</body>
+</html>

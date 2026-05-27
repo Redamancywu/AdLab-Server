@@ -9,15 +9,48 @@ import (
 
 // Config 顶层配置
 type Config struct {
-	Server   ServerConfig   `mapstructure:"server"`
-	Database DatabaseConfig `mapstructure:"database"`
-	DSP      DSPConfig      `mapstructure:"dsp"`
+	Server    ServerConfig    `mapstructure:"server"`
+	SDKAPI    SDKAPIConfig    `mapstructure:"sdkapi"`
+	Database  DatabaseConfig  `mapstructure:"database"`
+	DSP       DSPConfig       `mapstructure:"dsp"`
+	Log       LogConfig       `mapstructure:"log"`
+	JWT       JWTConfig       `mapstructure:"jwt"`
+	RateLimit RateLimitConfig `mapstructure:"rate_limit"`
+}
+
+// JWTConfig JWT 鉴权配置
+type JWTConfig struct {
+	Secret     string `mapstructure:"secret"`      // 签名密钥（生产环境请使用强随机值）
+	ExpireHour int    `mapstructure:"expire_hour"` // Token 有效时长（小时）
+}
+
+// RateLimitConfig API 限流配置
+type RateLimitConfig struct {
+	Enabled    bool `mapstructure:"enabled"`     // 是否开启限流
+	RPS        int  `mapstructure:"rps"`         // 每 IP 每秒最大请求数
+	Burst      int  `mapstructure:"burst"`       // 令牌桶突发容量
+}
+
+// LogConfig 日志配置
+type LogConfig struct {
+	Level string `mapstructure:"level"` // debug | info | warn | error
 }
 
 // ServerConfig HTTP 服务配置
 type ServerConfig struct {
 	Port int    `mapstructure:"port"` // 监听端口，默认 8080
 	Mode string `mapstructure:"mode"` // gin 模式：debug / release / test
+}
+
+// SDKAPIConfig SDK API 独立入口配置
+type SDKAPIConfig struct {
+	Port             int  `mapstructure:"port"`               // 独立 sdkapi 端口，0 表示跟随 server.port
+	EnableDocs       bool `mapstructure:"enable_docs"`        // 是否暴露 docs
+	EnableLab        bool `mapstructure:"enable_lab"`         // 是否暴露 lab/dsp 模拟器
+	EnableHealth     bool `mapstructure:"enable_health"`      // 是否暴露 health
+	RateLimitEnabled bool `mapstructure:"rate_limit_enabled"` // 是否开启 sdkapi 独立限流
+	RateLimitRPS     int  `mapstructure:"rate_limit_rps"`     // sdkapi 每 IP 每秒最大请求数
+	RateLimitBurst   int  `mapstructure:"rate_limit_burst"`   // sdkapi 令牌桶突发容量
 }
 
 // DatabaseConfig 数据库配置
@@ -69,6 +102,35 @@ func Load(path string) (*Config, error) {
 	if cfg.Server.Mode == "" {
 		cfg.Server.Mode = "debug"
 	}
+	if cfg.SDKAPI.Port == 0 {
+		cfg.SDKAPI.Port = cfg.Server.Port
+	}
+	if !v.IsSet("sdkapi.enable_docs") {
+		cfg.SDKAPI.EnableDocs = true
+	}
+	if !v.IsSet("sdkapi.enable_lab") {
+		cfg.SDKAPI.EnableLab = true
+	}
+	if !v.IsSet("sdkapi.enable_health") {
+		cfg.SDKAPI.EnableHealth = true
+	}
+	if !v.IsSet("sdkapi.rate_limit_enabled") {
+		cfg.SDKAPI.RateLimitEnabled = true
+	}
+	if cfg.SDKAPI.RateLimitRPS == 0 {
+		if cfg.RateLimit.RPS > 0 {
+			cfg.SDKAPI.RateLimitRPS = cfg.RateLimit.RPS
+		} else {
+			cfg.SDKAPI.RateLimitRPS = 100
+		}
+	}
+	if cfg.SDKAPI.RateLimitBurst == 0 {
+		if cfg.RateLimit.Burst > 0 {
+			cfg.SDKAPI.RateLimitBurst = cfg.RateLimit.Burst
+		} else {
+			cfg.SDKAPI.RateLimitBurst = 200
+		}
+	}
 	if cfg.Database.Path == "" {
 		cfg.Database.Path = "adlab.db"
 	}
@@ -89,6 +151,23 @@ func Load(path string) (*Config, error) {
 	}
 	if cfg.DSP.MaxConcurrency == 0 {
 		cfg.DSP.MaxConcurrency = 10
+	}
+	if cfg.Log.Level == "" {
+		cfg.Log.Level = "info"
+	}
+	// JWT 默认值
+	if cfg.JWT.Secret == "" {
+		cfg.JWT.Secret = "adlab-dev-secret-change-in-production"
+	}
+	if cfg.JWT.ExpireHour == 0 {
+		cfg.JWT.ExpireHour = 24
+	}
+	// 限流默认值
+	if cfg.RateLimit.RPS == 0 {
+		cfg.RateLimit.RPS = 100
+	}
+	if cfg.RateLimit.Burst == 0 {
+		cfg.RateLimit.Burst = 200
 	}
 
 	return &cfg, nil

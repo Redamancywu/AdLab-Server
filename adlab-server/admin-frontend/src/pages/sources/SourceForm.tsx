@@ -448,29 +448,40 @@ export default function SourceForm({ open, initial, onClose, onSuccess }: Props)
               SDK 配置
             </Divider>
 
+            <Alert
+              type="info"
+              showIcon
+              style={{ marginBottom: 16, fontSize: 12 }}
+              message={
+                <Text style={{ fontSize: 12 }}>
+                  应用级 SDK 初始化配置已迁移到应用详情页管理。这里保留 app_id / app_key / extra_params 仅用于兼容旧配置和模板参考，不建议作为新的主配置入口。
+                </Text>
+              }
+            />
+
             {meta.fields.appId && (
               <Form.Item
                 name="app_id"
-                label={meta.fields.appId}
-                extra={<Text type="secondary" style={{ fontSize: 11 }}>这里只填写平台应用级 App ID，不填写具体广告位 ID</Text>}
+                label={`${meta.fields.appId}（兼容字段）`}
+                extra={<Text type="secondary" style={{ fontSize: 11 }}>仅用于兼容旧配置；新的应用级初始化参数请在应用详情页的网络配置中维护</Text>}
               >
                 <Input placeholder={`输入 ${meta.fields.appId.split('（')[0]}`} />
               </Form.Item>
             )}
 
             {meta.fields.appKey && (
-              <Form.Item name="app_key" label={meta.fields.appKey} extra={<Text type="secondary" style={{ fontSize: 11 }}>这里只填写平台应用级密钥，具体广告位 ID 在广告位绑定时填写</Text>}>
+              <Form.Item name="app_key" label={`${meta.fields.appKey}（兼容字段）`} extra={<Text type="secondary" style={{ fontSize: 11 }}>仅用于兼容旧配置；新的应用级初始化参数请在应用详情页的网络配置中维护</Text>}>
                 <Input.Password placeholder={`输入 ${meta.fields.appKey.split('（')[0]}`} />
               </Form.Item>
             )}
 
             <Form.Item
               name="extra_params"
-              label="扩展参数（JSON，可选）"
+              label="扩展参数（JSON，可选，兼容字段）"
               extra={
                 meta.fields.extraHint
-                  ? <Text type="secondary" style={{ fontSize: 11 }}>示例：{meta.fields.extraHint}</Text>
-                  : <Text type="secondary" style={{ fontSize: 11 }}>其他网络特有参数，JSON 格式；具体广告位 ID 请在广告位绑定中设置</Text>
+                  ? <Text type="secondary" style={{ fontSize: 11 }}>兼容示例：{meta.fields.extraHint}</Text>
+                  : <Text type="secondary" style={{ fontSize: 11 }}>保留给兼容场景；新的初始化参数建议在应用详情页维护，广告位 ID 和请求级参数建议在实例绑定中设置</Text>
               }
             >
               <Input.TextArea

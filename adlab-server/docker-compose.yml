@@ -23,6 +23,8 @@ services:
       args:
         GO_BASE_IMAGE: ${GO_BASE_IMAGE:-golang:1.23-alpine}
         BACKEND_RUNTIME_IMAGE: ${BACKEND_RUNTIME_IMAGE:-alpine:3.20}
+        BACKEND_BINARY: ${BACKEND_BINARY:-adlab-server}
+        MAIN_PACKAGE: ${MAIN_PACKAGE:-./cmd/server/main.go}
     container_name: adlab-backend
     restart: unless-stopped
     depends_on:
@@ -43,6 +45,39 @@ services:
       - "8080:8080"
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  sdkapi:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+      args:
+        GO_BASE_IMAGE: ${GO_BASE_IMAGE:-golang:1.23-alpine}
+        BACKEND_RUNTIME_IMAGE: ${BACKEND_RUNTIME_IMAGE:-alpine:3.20}
+        BACKEND_BINARY: ${SDKAPI_BINARY:-adlab-sdkapi}
+        MAIN_PACKAGE: ${SDKAPI_MAIN_PACKAGE:-./cmd/sdkapi/main.go}
+    container_name: adlab-sdkapi
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ADLAB_CONFIG_PATH: /app/config/config.docker.yaml
+      ADLAB_DATABASE_TYPE: postgres
+      ADLAB_DATABASE_HOST: postgres
+      ADLAB_DATABASE_PORT: 5432
+      ADLAB_DATABASE_USER: ${POSTGRES_USER:-adlab}
+      ADLAB_DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-adlab}
+      ADLAB_DATABASE_DBNAME: ${POSTGRES_DB:-adlab}
+      ADLAB_DATABASE_SSLMODE: disable
+      ADLAB_DATABASE_TIMEZONE: ${TZ:-Asia/Shanghai}
+      ADLAB_SDKAPI_PORT: 8090
+    ports:
+      - "8090:8090"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8090/health || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -97,6 +132,8 @@ services:
       admin:
         condition: service_healthy
       backend:
+        condition: service_started
+      sdkapi:
         condition: service_started
     volumes:
       - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro

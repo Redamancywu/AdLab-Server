@@ -2,6 +2,15 @@ server:
   port: 8080
   mode: debug          # debug | release | test
 
+sdkapi:
+  port: 8080
+  enable_docs: true
+  enable_lab: true
+  enable_health: true
+  rate_limit_enabled: true
+  rate_limit_rps: 100
+  rate_limit_burst: 200
+
 database:
   type: sqlite3
   path: adlab.db
@@ -16,3 +25,6 @@ database:
 dsp:
   default_timeout_ms: 200
   max_concurrency: 10
+
+log:
+  level: info  # debug | info | warn | error

@@ -55,7 +55,7 @@ func (r *AppRepository) FindAll(page, pageSize int) ([]model.App, int64, error) 
 // FindWithPlacements 查询应用及其关联广告位
 func (r *AppRepository) FindWithPlacements(appID string) (*model.App, error) {
 	var app model.App
-	result := r.db.Preload("Placements").Where("app_id = ?", appID).First(&app)
+	result := r.db.Preload("Placements").Preload("AppNetworkConfigs").Where("app_id = ?", appID).First(&app)
 	if result.Error != nil {
 		if result.Error == gorm.ErrRecordNotFound {
 			return nil, errors.New(errors.CodeEntityNotFound, "应用不存在: "+appID)

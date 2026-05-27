@@ -13,7 +13,8 @@ package main
 
 import (
 	"fmt"
-	"log"
+	"log/slog"
+	"os"
 
 	"adlab-server/internal/database"
 	"adlab-server/internal/model"
@@ -67,16 +68,19 @@ const (
 func main() {
 	cfg, err := database.LoadConfig()
 	if err != nil {
-		log.Fatalf("加载配置失败: %v", err)
+		slog.Error("加载配置失败", "error", err)
+		os.Exit(1)
 	}
 
 	db, err := database.Open(cfg)
 	if err != nil {
-		log.Fatalf("打开数据库失败: %v", err)
+		slog.Error("打开数据库失败", "error", err)
+		os.Exit(1)
 	}
 
 	if err := model.AutoMigrate(db); err != nil {
-		log.Fatalf("数据库迁移失败: %v", err)
+		slog.Error("数据库迁移失败", "error", err)
+		os.Exit(1)
 	}
 
 	fmt.Println("🌱 开始初始化种子数据...")
@@ -100,7 +104,7 @@ func main() {
 	for _, a := range apps {
 		a := a
 		if err := db.FirstOrCreate(&a, model.App{AppID: a.AppID}).Error; err != nil {
-			log.Printf("创建应用失败 %s: %v", a.AppID, err)
+			slog.Warn("创建应用失败", "app_id", a.AppID, "error", err)
 		} else {
 			fmt.Printf("✓ 应用: %s (%s)\n", a.AppID, a.Platform)
 		}
@@ -116,7 +120,7 @@ func main() {
 	for _, p := range placements {
 		p := p
 		if err := db.FirstOrCreate(&p, model.Placement{PlacementID: p.PlacementID}).Error; err != nil {
-			log.Printf("创建广告位失败 %s: %v", p.PlacementID, err)
+			slog.Warn("创建广告位失败", "placement_id", p.PlacementID, "error", err)
 		} else {
 			fmt.Printf("✓ 广告位: %s\n", p.PlacementID)
 		}
@@ -132,7 +136,7 @@ func main() {
 	for _, s := range sources {
 		s := s
 		if err := db.FirstOrCreate(&s, model.AdSource{SourceID: s.SourceID}).Error; err != nil {
-			log.Printf("创建广告源失败 %s: %v", s.SourceID, err)
+			slog.Warn("创建广告源失败", "source_id", s.SourceID, "error", err)
 		} else {
 			fmt.Printf("✓ 广告源: %s\n", s.SourceID)
 		}
@@ -152,7 +156,7 @@ func main() {
 	for _, b := range bindings {
 		b := b
 		if err := db.FirstOrCreate(&b, b).Error; err != nil {
-			log.Printf("绑定失败 %s->%s: %v", b.PlacementID, b.SourceID, err)
+			slog.Warn("绑定失败", "placement_id", b.PlacementID, "source_id", b.SourceID, "error", err)
 		} else {
 			fmt.Printf("✓ 绑定: %s -> %s\n", b.PlacementID, b.SourceID)
 		}
@@ -186,7 +190,7 @@ func main() {
 	for _, cfg := range dspConfigs {
 		cfg := cfg
 		if err := db.FirstOrCreate(&cfg, model.DSPConfig{SourceID: cfg.SourceID}).Error; err != nil {
-			log.Printf("创建 DSP 配置失败 %s: %v", cfg.SourceID, err)
+			slog.Warn("创建 DSP 配置失败", "source_id", cfg.SourceID, "error", err)
 		} else {
 			fmt.Printf("✓ DSP 配置: %s (%s)\n", cfg.SourceID, cfg.BidMode)
 		}
@@ -248,7 +252,7 @@ func main() {
 	for _, m := range materials {
 		m := m
 		if err := db.FirstOrCreate(&m, model.Material{MaterialID: m.MaterialID}).Error; err != nil {
-			log.Printf("创建素材失败 %s: %v", m.MaterialID, err)
+			slog.Warn("创建素材失败", "material_id", m.MaterialID, "error", err)
 		} else {
 			fmt.Printf("✓ 素材: %s\n", m.MaterialID)
 		}
@@ -383,7 +387,7 @@ func main() {
 	for _, ad := range mockAds {
 		ad := ad
 		if err := db.FirstOrCreate(&ad, model.MockAd{MockAdID: ad.MockAdID}).Error; err != nil {
-			log.Printf("创建 Mock 广告失败 %s: %v", ad.MockAdID, err)
+			slog.Warn("创建 Mock 广告失败", "mock_ad_id", ad.MockAdID, "error", err)
 		} else {
 			fmt.Printf("✓ Mock 广告: %s (%s)\n", ad.MockAdID, ad.AdType)
 		}

@@ -13,6 +13,7 @@ import StatsPage from './pages/stats/StatsPage'
 import ChangeLogList from './pages/change-logs/ChangeLogList'
 import SettingsPage from './pages/settings/SettingsPage'
 import AdPlayer from './pages/ad-player/AdPlayer'
+import DocsEditor from './pages/docs-editor/DocsEditor'
 
 export default function App() {
   return (
@@ -32,6 +33,7 @@ export default function App() {
           <Route path="change-logs" element={<ChangeLogList />} />
           <Route path="settings" element={<SettingsPage />} />
           <Route path="ad-player" element={<AdPlayer />} />
+          <Route path="docs-editor" element={<DocsEditor />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>

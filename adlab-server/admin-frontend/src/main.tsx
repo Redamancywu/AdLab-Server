@@ -46,7 +46,7 @@ function Root() {
           borderRadius: 10,
           borderRadiusSM: 8,
           borderRadiusLG: 16,
-          fontFamily: "'Inter', 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif",
+          fontFamily: "'Outfit', 'Inter', 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif",
           colorBgContainer: '#ffffff',
           colorBgLayout: '#f5f7fb',
           colorBorder: '#d6dce8',

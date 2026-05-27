@@ -49,5 +49,6 @@ type App struct {
 	UpdatedAt   time.Time   `json:"updated_at"`
 
 	// 关联广告位（一对多）
-	Placements []Placement `gorm:"foreignKey:AppID;references:AppID" json:"placements,omitempty"`
+	Placements         []Placement        `gorm:"foreignKey:AppID;references:AppID" json:"placements,omitempty"`
+	AppNetworkConfigs  []AppNetworkConfig `gorm:"foreignKey:AppID;references:AppID" json:"app_network_configs,omitempty"`
 }

@@ -2,7 +2,8 @@ package database
 
 import (
 	"fmt"
-	"log"
+	"log/slog"
+	"time"
 
 	"adlab-server/internal/config"
 
@@ -33,7 +34,18 @@ func Open(cfg *config.Config) (*gorm.DB, error) {
 		return nil, fmt.Errorf("连接数据库失败: %w", err)
 	}
 
-	log.Printf("数据库连接成功: %s (%s)", cfg.Database.Type, dsn)
+	// ── 连接池调优 ──────────────────────────────────────────
+	// 获取底层 *sql.DB 配置连接池参数（生产环境关键配置）
+	sqlDB, err := db.DB()
+	if err != nil {
+		return nil, fmt.Errorf("获取底层 sql.DB 失败: %w", err)
+	}
+	sqlDB.SetMaxOpenConns(100)            // 最大打开连接数（防止数据库连接耗尽）
+	sqlDB.SetMaxIdleConns(20)             // 最大空闲连接数（保持连接池热度，减少新建连接延迟）
+	sqlDB.SetConnMaxLifetime(time.Hour)   // 连接最大存活时间（避免使用长期失效的连接）
+	sqlDB.SetConnMaxIdleTime(30 * time.Minute) // 连接最大空闲时间（回收长期闲置连接）
+
+	slog.Info("数据库连接成功", "type", cfg.Database.Type, "dsn", dsn)
 	return db, nil
 }
 

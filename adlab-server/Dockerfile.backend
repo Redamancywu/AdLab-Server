@@ -1,5 +1,7 @@
 ARG GO_BASE_IMAGE=golang:1.23-alpine
 ARG BACKEND_RUNTIME_IMAGE=alpine:3.20
+ARG BACKEND_BINARY=adlab-server
+ARG MAIN_PACKAGE=./cmd/server/main.go
 
 FROM ${GO_BASE_IMAGE} AS builder
 
@@ -12,7 +14,7 @@ RUN go mod download
 
 COPY . .
 
-RUN CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -o /out/adlab-server ./cmd/server/main.go
+RUN CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -o /out/${BACKEND_BINARY} ${MAIN_PACKAGE}
 
 FROM ${BACKEND_RUNTIME_IMAGE}
 
@@ -20,9 +22,9 @@ WORKDIR /app
 
 RUN apk add --no-cache ca-certificates tzdata wget
 
-COPY --from=builder /out/adlab-server /app/adlab-server
+COPY --from=builder /out/${BACKEND_BINARY} /app/${BACKEND_BINARY}
 COPY config /app/config
 
 EXPOSE 8080
 
-CMD ["/app/adlab-server"]
+CMD ["/bin/sh", "-c", "/app/${BACKEND_BINARY}"]

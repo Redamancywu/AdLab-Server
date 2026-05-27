@@ -86,6 +86,20 @@ cd adlab-server
 go run ./cmd/server/main.go
 ```
 
+仅启动 SDK API：
+
+```bash
+cd adlab-server
+go run ./cmd/sdkapi/main.go
+```
+
+或者使用 Make：
+
+```bash
+cd adlab-server
+make run-sdkapi
+```
+
 前端：
 
 ```bash
@@ -108,7 +122,66 @@ npm run dev
 ## 文档
 
 - [部署文档](./adlab-server/docs/deploy-postgres-compose.md)
+- [SDKAPI 部署文档](./adlab-server/docs/deploy-sdkapi.md)
 - [管理后台整合设计](./docs/2026-05-16-adlab-admin-consolidation-design.md)
+
+## SDK API 运行模式
+
+AdLab 现在支持两种后端入口：
+
+- `cmd/server`：全量模式，包含管理后台、SDK API、文档与运维相关路由
+- `cmd/sdkapi`：轻量模式，专注 SDK / public 路由
+
+`cmd/sdkapi` 会读取 `adlab-server/config/config.yaml` 中的 `sdkapi` 配置段，常用字段包括：
+
+- `sdkapi.port`
+- `sdkapi.enable_docs`
+- `sdkapi.enable_lab`
+- `sdkapi.enable_health`
+- `sdkapi.rate_limit_enabled`
+- `sdkapi.rate_limit_rps`
+- `sdkapi.rate_limit_burst`
+
+### Docker / Compose
+
+可以单独拉起 SDK API：
+
+```bash
+cd adlab-server
+docker compose up -d postgres sdkapi
+```
+
+默认情况下：
+
+- `backend` 监听 `8080`
+- `sdkapi` 监听 `8090`
+- Nginx 会把 `/api/*` 代理到 `sdkapi`
+
+`sdkapi` 进程还会输出一层轻量访问日志，并带有 `component=sdkapi` 标签，方便快速区分 SDK 流量。
+同时还会暴露最小 `/metrics`，并在启动时打印一份 runtime 配置摘要。
+
+### Readiness 与 Smoke 检查
+
+SDK API 模式会暴露：
+
+- `/health`：基础存活检查
+- `/ready`：就绪检查（包含数据库连通性）
+
+可以用下面的命令做一次最小 smoke 检查：
+
+```bash
+cd adlab-server
+make smoke-sdkapi
+```
+
+### 纯 SDKAPI Compose 形态
+
+如果你只想启动最小的 `postgres + sdkapi` 形态：
+
+```bash
+cd adlab-server
+docker compose -f docker-compose.sdkapi.yml up -d
+```
 
 ## 社区协作
 
