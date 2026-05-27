@@ -1,0 +1,1586 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "AdLab Server — SDK API",
+    "description": "AdLab Server 为移动端广告 SDK 提供的服务端 API。\n\n## 快速开始\n\n1. **获取投放策略** — SDK 初始化时调用，获取广告位配置和各网络 SDK 参数\n2. **发起竞价** — 根据广告源的 bid_mode 选择 S2S / C2S / Waterfall / Mock\n3. **上报追踪事件** — 广告展示、播放进度、点击等事件\n\n## 认证\n\nSDK API 无需认证。管理 API (`/admin/*`) 需要 Bearer Token（开发模式下可留空）。\n\n## 响应格式\n\n所有接口统一返回：\n```json\n{\"code\": 0, \"message\": \"success\", \"data\": {...}}\n```\n`code=0` 表示成功，非零为错误码。",
+    "version": "1.0.0",
+    "contact": {
+      "name": "AdLab Server",
+      "url": "http://localhost:8080/docs"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8080",
+      "description": "本地开发服务器"
+    }
+  ],
+  "tags": [
+    {
+      "name": "SDK Init",
+      "description": "SDK 初始化 — App 启动时调用，获取所有广告位配置和网络 SDK 参数"
+    },
+    {
+      "name": "Ad Request",
+      "description": "统一广告请求 — SDK 请求广告的唯一入口，服务端自动处理竞价和 Mock 兜底"
+    },
+    {
+      "name": "Strategy",
+      "description": "策略投放 — SDK 初始化时获取广告位配置"
+    },
+    {
+      "name": "S2S Bidding",
+      "description": "S2S 竞价 — 服务端代理向 DSP 发起 OpenRTB 竞价"
+    },
+    {
+      "name": "C2S Reporting",
+      "description": "C2S 上报 — 客户端本地竞价结果上报"
+    },
+    {
+      "name": "Waterfall",
+      "description": "Waterfall 竞价 — 按优先级顺序请求，有填充即停"
+    },
+    {
+      "name": "Mock Ad",
+      "description": "Mock 广告 — 无第三方 DSP 时的本地广告填充"
+    },
+    {
+      "name": "VAST",
+      "description": "VAST 生成 — 生成符合 VAST 4.2 规范的视频广告 XML"
+    },
+    {
+      "name": "Tracking",
+      "description": "事件追踪 — 广告播放全链路事件上报"
+    },
+    {
+      "name": "Logs",
+      "description": "日志查询 — 竞价日志和追踪事件查询"
+    }
+  ],
+  "paths": {
+    "/api/v1/strategy/{placement_id}": {
+      "get": {
+        "tags": [
+          "Strategy"
+        ],
+        "summary": "获取广告位投放策略",
+        "description": "SDK 初始化时调用。返回广告位类型、所有关联广告源的配置（含第三方网络 App ID/Key/Ad Unit ID）以及所属 App 信息。\n\n**缓存**：服务端缓存 30 秒，配置变更后自动失效。",
+        "operationId": "getStrategy",
+        "parameters": [
+          {
+            "name": "placement_id",
+            "in": "path",
+            "required": true,
+            "description": "广告位 ID（16位 hex，如 `9c6bde662a2c9361`）",
+            "schema": {
+              "type": "string",
+              "example": "placement_rewarded_001"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StrategyResponse"
+                },
+                "example": {
+                  "code": 0,
+                  "message": "success",
+                  "data": {
+                    "placement_id": "placement_rewarded_001",
+                    "ad_type": "rewarded_video",
+                    "floor_price": 0,
+                    "sources": [
+                      {
+                        "source_id": "dsp_alpha",
+                        "name": "DSP Alpha",
+                        "bid_mode": "s2s",
+                        "priority": 1,
+                        "floor_price": 0.5,
+                        "timeout_ms": 200,
+                        "status": "active",
+                        "network_type": "custom",
+                        "dsp_config": {
+                          "bid_mode": "random",
+                          "bid_min": 0.8,
+                          "bid_max": 2.5,
+                          "fill_rate": 85,
+                          "latency_ms": 40
+                        }
+                      },
+                      {
+                        "source_id": "admob_rewarded",
+                        "name": "AdMob Rewarded",
+                        "bid_mode": "c2s",
+                        "priority": 2,
+                        "network_type": "admob",
+                        "app_id": "ca-app-pub-3940256099942544",
+                        "ad_unit_id": "ca-app-pub-3940256099942544/1712485313"
+                      }
+                    ],
+                    "app": {
+                      "app_id": "app_ios_001",
+                      "name": "My Game iOS",
+                      "platform": "ios",
+                      "bundle_id": "com.example.mygame",
+                      "category": "game"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "广告位不存在或未激活",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/s2s/bid": {
+      "post": {
+        "tags": [
+          "S2S Bidding"
+        ],
+        "summary": "发起 S2S 竞价",
+        "description": "服务端代理向所有 active S2S 广告源并发发送 OpenRTB 2.6 竞价请求，选出最高有效出价，返回胜出 DSP 的 VAST XML 或广告标记。\n\n**适用场景**：广告源 `bid_mode=s2s`\n\n**无填充时**：返回 HTTP 204 No Content",
+        "operationId": "s2sBid",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/S2SBidRequest"
+              },
+              "example": {
+                "placement_id": "placement_rewarded_001",
+                "app": {
+                  "bundle": "com.example.mygame",
+                  "name": "My Game",
+                  "version": "1.0.0"
+                },
+                "device": {
+                  "ua": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0)",
+                  "ip": "1.2.3.4",
+                  "os": "iOS",
+                  "model": "iPhone15,2",
+                  "ifa": "550e8400-e29b-41d4-a716-446655440000"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "竞价成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/S2SBidResponse"
+                },
+                "example": {
+                  "code": 0,
+                  "message": "success",
+                  "data": {
+                    "request_id": "18805746f430ac65",
+                    "winner_dsp_id": "dsp_alpha",
+                    "winner_price": 2.2735,
+                    "ad_markup": "<VAST version=\"4.2\">...</VAST>",
+                    "status": "success"
+                  }
+                }
+              }
+            }
+          },
+          "204": {
+            "description": "无有效出价（no fill）"
+          }
+        }
+      }
+    },
+    "/api/v1/waterfall/bid": {
+      "post": {
+        "tags": [
+          "Waterfall"
+        ],
+        "summary": "发起 Waterfall 竞价",
+        "description": "按广告源 `priority` 升序逐一请求，收到有效出价（高于底价）即停止，不等待其他 DSP。\n\n**适用场景**：广告源 `bid_mode=waterfall`\n\n响应中包含 `tried_dsps` 字段，记录尝试了哪些 DSP 才找到填充。",
+        "operationId": "waterfallBid",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/S2SBidRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "竞价成功",
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": 0,
+                  "message": "success",
+                  "data": {
+                    "request_id": "e53cac6f48787850",
+                    "winner_dsp_id": "dsp_waterfall_2",
+                    "winner_price": 1.5,
+                    "ad_markup": "<VAST .../>",
+                    "status": "success",
+                    "tried_dsps": [
+                      "dsp_waterfall_1",
+                      "dsp_waterfall_2"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "204": {
+            "description": "所有 DSP 均无填充"
+          }
+        }
+      }
+    },
+    "/api/v1/c2s/result": {
+      "post": {
+        "tags": [
+          "C2S Reporting"
+        ],
+        "summary": "上报 C2S 竞价结果",
+        "description": "SDK 在客户端完成本地竞价后，将竞价结果上报给服务端。\n\n**幂等性**：同一 `request_id` 只能上报一次，重复上报返回错误码 1201。\n\n**Win Notice**：若 `displayed=true` 且胜出 DSP 的 `support_win_notice=true`，服务端会代理发送 Win Notice。",
+        "operationId": "c2sReport",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/C2SReportRequest"
+              },
+              "example": {
+                "request_id": "sdk-c2s-001",
+                "placement_id": "placement_rewarded_001",
+                "winner_dsp_id": "dsp_alpha",
+                "winner_price": 1.5,
+                "displayed": false,
+                "bidding_details": [
+                  {
+                    "dsp_id": "dsp_alpha",
+                    "bid_price": 1.5,
+                    "status": "win"
+                  },
+                  {
+                    "dsp_id": "dsp_beta",
+                    "bid_price": 0.8,
+                    "status": "lose"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "上报成功",
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": 0,
+                  "message": "success",
+                  "data": {
+                    "request_id": "sdk-c2s-001",
+                    "proxy_win_sent": false
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "参数错误或重复上报（code=1201）"
+          }
+        }
+      }
+    },
+    "/api/v1/c2s/display": {
+      "post": {
+        "tags": [
+          "C2S Reporting"
+        ],
+        "summary": "确认广告展示",
+        "description": "SDK 在广告实际展示给用户后调用，更新展示状态并触发 Win Notice 代理发送。\n\n**调用时机**：广告开始播放/展示时（不是竞价时）。\n\n**幂等性**：重复调用安全，不会重复发送 Win Notice。",
+        "operationId": "c2sDisplay",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "request_id"
+                ],
+                "properties": {
+                  "request_id": {
+                    "type": "string",
+                    "description": "C2S 上报时的 request_id"
+                  },
+                  "displayed": {
+                    "type": "boolean",
+                    "default": true
+                  }
+                }
+              },
+              "example": {
+                "request_id": "sdk-c2s-001",
+                "displayed": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "确认成功",
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": 0,
+                  "message": "success",
+                  "data": {
+                    "request_id": "sdk-c2s-001",
+                    "proxy_win_sent": true
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/mock/fill": {
+      "post": {
+        "tags": [
+          "Mock Ad"
+        ],
+        "summary": "获取 Mock 广告填充",
+        "description": "在没有第三方 DSP 或测试环境中，获取本地 Mock 广告素材。\n\n根据广告类型返回不同内容：\n- `rewarded_video` / `interstitial` → VAST XML\n- `banner` → 图片 URL\n- `splash` → 开屏图片/视频 URL\n- `native` → 原生广告内容对象\n\n**无填充时**：返回 HTTP 204",
+        "operationId": "mockFill",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "placement_id": {
+                    "type": "string",
+                    "description": "广告位 ID（可选，用于自动推断广告类型）"
+                  },
+                  "ad_type": {
+                    "type": "string",
+                    "enum": [
+                      "rewarded_video",
+                      "interstitial",
+                      "banner",
+                      "splash",
+                      "native"
+                    ],
+                    "description": "广告类型（优先级高于 placement_id 推断）"
+                  }
+                }
+              },
+              "example": {
+                "placement_id": "placement_rewarded_001",
+                "ad_type": "rewarded_video"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "填充成功",
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": 0,
+                  "message": "success",
+                  "data": {
+                    "request_id": "a1b2c3d4e5f60001",
+                    "mock_ad_id": "a1b2c3d4e5f60001",
+                    "ad_type": "rewarded_video",
+                    "cpm_price": 2.5,
+                    "status": "success",
+                    "vast_xml": "<?xml version=\"1.0\"?><VAST version=\"4.2\">...</VAST>",
+                    "click_url": "https://example.com",
+                    "track_urls": {
+                      "impression": "http://localhost:8080/api/v1/track?event=impression&...",
+                      "click": "http://localhost:8080/api/v1/track?event=click&...",
+                      "start": "http://localhost:8080/api/v1/track?event=start&...",
+                      "complete": "http://localhost:8080/api/v1/track?event=complete&..."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "204": {
+            "description": "没有可用的 Mock 广告"
+          }
+        }
+      }
+    },
+    "/api/v1/vast/generate": {
+      "get": {
+        "tags": [
+          "VAST"
+        ],
+        "summary": "生成 VAST 4.2 XML",
+        "description": "根据素材 ID 和请求 ID 生成符合 VAST 4.2 规范的视频广告 XML。\n\nXML 中内嵌指向本服务 `/api/v1/track` 的追踪 URL，覆盖 7 种事件：\n`impression` / `click` / `start` / `firstQuartile` / `midpoint` / `thirdQuartile` / `complete`",
+        "operationId": "generateVAST",
+        "parameters": [
+          {
+            "name": "material_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "素材 ID"
+          },
+          {
+            "name": "request_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "竞价请求 ID（用于追踪关联）"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "VAST XML",
+            "content": {
+              "application/xml": {
+                "example": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<VAST version=\"4.2\">\n  <Ad id=\"request_id\">\n    <InLine>\n      <AdSystem version=\"1.0\">AdLab Server</AdSystem>\n      <AdTitle>Ad Title</AdTitle>\n      <Impression id=\"impression\">http://localhost:8080/api/v1/track?event=impression&amp;...</Impression>\n      <Creatives>...</Creatives>\n    </InLine>\n  </Ad>\n</VAST>"
+              }
+            }
+          },
+          "404": {
+            "description": "素材不存在（code=1303）"
+          }
+        }
+      }
+    },
+    "/api/v1/track": {
+      "get": {
+        "tags": [
+          "Tracking"
+        ],
+        "summary": "上报追踪事件（GET）",
+        "description": "记录广告播放追踪事件。GET 请求成功后返回 1x1 透明 GIF 像素图片（适合 img 标签追踪）。\n\n**支持的事件类型**：\n`impression` / `click` / `start` / `firstQuartile` / `midpoint` / `thirdQuartile` / `complete` / `mute` / `unmute` / `pause` / `resume` / `skip`",
+        "operationId": "trackGet",
+        "parameters": [
+          {
+            "name": "event",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "impression",
+                "click",
+                "start",
+                "firstQuartile",
+                "midpoint",
+                "thirdQuartile",
+                "complete",
+                "mute",
+                "unmute",
+                "pause",
+                "resume",
+                "skip"
+              ]
+            },
+            "description": "事件类型"
+          },
+          {
+            "name": "request_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "竞价请求 ID"
+          },
+          {
+            "name": "material_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "素材 ID"
+          },
+          {
+            "name": "ts",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "客户端时间戳（Unix 毫秒，可选）"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "1x1 透明 GIF",
+            "content": {
+              "image/gif": {}
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Tracking"
+        ],
+        "summary": "上报追踪事件（POST）",
+        "description": "同 GET，但通过 POST body 传参，成功返回 HTTP 204。",
+        "operationId": "trackPost",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "event",
+                  "request_id",
+                  "material_id"
+                ],
+                "properties": {
+                  "event": {
+                    "type": "string"
+                  },
+                  "request_id": {
+                    "type": "string"
+                  },
+                  "material_id": {
+                    "type": "string"
+                  },
+                  "ts": {
+                    "type": "integer",
+                    "description": "Unix 毫秒时间戳"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "记录成功"
+          }
+        }
+      }
+    },
+    "/api/v1/logs/requests": {
+      "get": {
+        "tags": [
+          "Logs"
+        ],
+        "summary": "查询竞价日志",
+        "operationId": "queryLogs",
+        "parameters": [
+          {
+            "name": "placement_id",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "bid_mode",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "s2s",
+                "c2s",
+                "waterfall"
+              ]
+            }
+          },
+          {
+            "name": "start_time",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "RFC3339 格式"
+          },
+          {
+            "name": "end_time",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "分页日志列表"
+          }
+        }
+      }
+    },
+    "/api/v1/logs/requests/{request_id}": {
+      "get": {
+        "tags": [
+          "Logs"
+        ],
+        "summary": "获取单次竞价详情",
+        "operationId": "getLogDetail",
+        "parameters": [
+          {
+            "name": "request_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "竞价详情（含所有 DSP 明细）"
+          }
+        }
+      }
+    },
+    "/api/v1/logs/tracking/{request_id}": {
+      "get": {
+        "tags": [
+          "Logs"
+        ],
+        "summary": "获取追踪事件链",
+        "operationId": "getTrackingChain",
+        "parameters": [
+          {
+            "name": "request_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "追踪事件列表（按时间戳升序）"
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "summary": "健康检查",
+        "operationId": "health",
+        "responses": {
+          "200": {
+            "description": "服务正常",
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": 0,
+                  "message": "ok",
+                  "data": {
+                    "status": "healthy",
+                    "db": "ok"
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "服务异常（数据库连接失败）"
+          }
+        }
+      }
+    },
+    "/api/v1/sdk/init": {
+      "post": {
+        "tags": [
+          "SDK Init"
+        ],
+        "summary": "SDK 初始化",
+        "description": "**SDK 启动时调用（必须）**。返回的是配置快照，分成三层：\n\n**`global`**：SDK 运行期公共配置，例如默认超时、心跳间隔、Mock 兜底开关。\n\n**`networks`**（App 级别）：需要初始化的广告网络列表，SDK 收到后逐一调用各网络 SDK 的 `initialize()` 方法：\n- `adapter_class`：SDK 中对应的 Adapter 类名\n- `init_params`：初始化参数快照，例如 AdMob App ID、AppLovin SDK Key\n- `status`：当前网络配置状态\n\n**`placements`**（广告位级别）：每个广告位的配置快照：\n- `placement_params`：广告位公共策略\n- `instances`：新的实例级配置，SDK 应优先消费\n- `waterfall`：兼容旧 SDK 的瀑布流输出，和 `instances` 来自同一份排序结果\n\n**初始化完成后**：调用 `/api/v1/sdk/init_complete` 上报各网络初始化结果",
+        "operationId": "sdkInit",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "app_id"
+                ],
+                "properties": {
+                  "app_id": {
+                    "type": "string",
+                    "description": "AdLab 应用 ID（在 Admin 后台创建应用后获取）"
+                  },
+                  "sdk_version": {
+                    "type": "string",
+                    "description": "SDK 版本号，如 \"1.0.0\""
+                  },
+                  "platform": {
+                    "type": "string",
+                    "enum": [
+                      "ios",
+                      "android"
+                    ],
+                    "description": "客户端平台"
+                  },
+                  "device": {
+                    "type": "object",
+                    "properties": {
+                      "os_version": {
+                        "type": "string",
+                        "description": "系统版本，如 \"17.0\""
+                      },
+                      "device_model": {
+                        "type": "string",
+                        "description": "设备型号，如 \"iPhone15,2\""
+                      },
+                      "language": {
+                        "type": "string",
+                        "description": "设备语言，如 \"zh-CN\""
+                      }
+                    }
+                  }
+                }
+              },
+              "example": {
+                "app_id": "app_ios_001",
+                "sdk_version": "1.0.0",
+                "platform": "ios",
+                "device": {
+                  "os_version": "17.0",
+                  "device_model": "iPhone15,2",
+                  "language": "zh-CN"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "初始化成功",
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": 0,
+                  "message": "success",
+                  "data": {
+                    "app_id": "app_ios_001",
+                    "app_name": "My Game iOS",
+                    "bundle_id": "com.example.mygame",
+                    "platform": "ios",
+                    "config_version": 1778847533663,
+                    "config_hash": "sha256:example",
+                    "global": {
+                      "default_timeout_ms": 800,
+                      "max_retries": 1,
+                      "enable_mock_fallback": true,
+                      "log_level": "info",
+                      "heartbeat_interval_s": 300
+                    },
+                    "networks": [
+                      {
+                        "network_type": "admob",
+                        "adapter_class": "AdLabAdMobAdapter",
+                        "init_params": {
+                          "app_id": "ca-app-pub-3940256099942544~1458002511"
+                        },
+                        "status": "active"
+                      }
+                    ],
+                    "placements": [
+                      {
+                        "placement_id": "placement_rewarded_001",
+                        "ad_type": "rewarded_video",
+                        "floor_price": 0,
+                        "status": "active",
+                        "placement_params": {
+                          "default_timeout_ms": 800,
+                          "default_floor_price": 0,
+                          "cache_ttl_s": 3600
+                        },
+                        "instances": [
+                          {
+                            "source_id": "dsp_alpha",
+                            "network_type": "custom",
+                            "bid_mode": "s2s",
+                            "priority": 1,
+                            "floor_price": 0.5,
+                            "timeout_ms": 200,
+                            "stats": {
+                              "historical_ecpm": 0,
+                              "sample_count": 0
+                            },
+                            "status": "active"
+                          },
+                          {
+                            "instance_id": "placement_rewarded_001_admob_rewarded",
+                            "instance_name": "Rewarded AdMob Main",
+                            "source_id": "admob_rewarded",
+                            "network_type": "admob",
+                            "bid_mode": "c2s",
+                            "priority": 2,
+                            "ad_unit_id": "ca-app-pub-3940256099942544/1712485313",
+                            "timeout_ms": 1200,
+                            "floor_price": 1.2,
+                            "load_params": {
+                              "orientation": "portrait"
+                            },
+                            "stats": {
+                              "historical_ecpm": 2.31,
+                              "sample_count": 187
+                            },
+                            "status": "active"
+                          }
+                        ],
+                        "waterfall": [
+                          {
+                            "source_id": "admob_rewarded",
+                            "network_type": "admob",
+                            "bid_mode": "c2s",
+                            "priority": 2,
+                            "ad_unit_id": "ca-app-pub-3940256099942544/1712485313",
+                            "timeout_ms": 1200,
+                            "floor_price": 1.2,
+                            "historical_ecpm": 2.31
+                          }
+                        ]
+                      }
+                    ],
+                    "server_time": 1778847533663
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "应用不存在或未激活"
+          }
+        }
+      }
+    },
+    "/api/v1/ad/request": {
+      "post": {
+        "tags": [
+          "Ad Request"
+        ],
+        "summary": "统一广告请求",
+        "description": "**SDK 请求广告的统一入口**。服务端自动处理所有竞价逻辑，SDK 只需传入广告位 ID 和设备信息。\n\n**服务端处理流程**：\n1. 查询广告位配置，确定竞价模式（s2s/waterfall/c2s）\n2. 执行竞价（S2S 并发竞价 / Waterfall 顺序竞价）\n3. 若所有 DSP 无填充，**自动用 Mock 广告兜底**（`is_mock=true`）\n4. 返回统一格式的广告内容\n\n**SDK 无需关心**：竞价模式、Mock 广告、DSP 选择——这些都由服务端决策。\n\n**无填充时**：返回 HTTP 204 No Content（Mock 也无可用广告时）\n\n**广告内容字段**（根据 `ad_type` 填充不同字段）：\n- `rewarded_video` / `interstitial` → `vast_xml`\n- `banner` → `image_url`\n- `splash` → `splash_url`\n- `native` → `native_ad`",
+        "operationId": "requestAd",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "placement_id"
+                ],
+                "properties": {
+                  "placement_id": {
+                    "type": "string",
+                    "description": "广告位 ID（从 SDK 初始化响应中获取）"
+                  },
+                  "app": {
+                    "type": "object",
+                    "description": "应用信息（可选，优先级高于广告位关联的 App）",
+                    "properties": {
+                      "app_id": {
+                        "type": "string"
+                      },
+                      "bundle_id": {
+                        "type": "string",
+                        "description": "应用包名"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "version": {
+                        "type": "string",
+                        "description": "应用版本"
+                      },
+                      "store_url": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "device": {
+                    "type": "object",
+                    "description": "设备信息（影响 DSP 出价，建议尽量填写）",
+                    "properties": {
+                      "platform": {
+                        "type": "string",
+                        "enum": [
+                          "ios",
+                          "android"
+                        ]
+                      },
+                      "os_version": {
+                        "type": "string",
+                        "description": "系统版本，如 \"17.0\""
+                      },
+                      "device_model": {
+                        "type": "string",
+                        "description": "设备型号，如 \"iPhone15,2\""
+                      },
+                      "screen_w": {
+                        "type": "integer",
+                        "description": "屏幕宽度（px），Banner 尺寸适配用"
+                      },
+                      "screen_h": {
+                        "type": "integer",
+                        "description": "屏幕高度（px）"
+                      },
+                      "ifa": {
+                        "type": "string",
+                        "description": "广告标识符（iOS: IDFA，Android: GAID）"
+                      },
+                      "ifa_type": {
+                        "type": "string",
+                        "enum": [
+                          "idfa",
+                          "gaid",
+                          "custom"
+                        ],
+                        "description": "IFA 类型"
+                      },
+                      "ip": {
+                        "type": "string",
+                        "description": "设备 IP（留空则从请求头自动获取）"
+                      },
+                      "ua": {
+                        "type": "string",
+                        "description": "User-Agent（留空则从请求头自动获取）"
+                      },
+                      "language": {
+                        "type": "string",
+                        "description": "设备语言，如 \"zh-CN\""
+                      },
+                      "carrier": {
+                        "type": "string",
+                        "description": "运营商"
+                      },
+                      "conn_type": {
+                        "type": "string",
+                        "enum": [
+                          "wifi",
+                          "cellular",
+                          "unknown"
+                        ]
+                      },
+                      "lat": {
+                        "type": "number",
+                        "description": "纬度（可选）"
+                      },
+                      "lon": {
+                        "type": "number",
+                        "description": "经度（可选）"
+                      }
+                    }
+                  },
+                  "bid_mode": {
+                    "type": "string",
+                    "enum": [
+                      "s2s",
+                      "c2s",
+                      "waterfall"
+                    ],
+                    "description": "强制指定竞价模式（不传则使用广告位配置）"
+                  },
+                  "floor_price": {
+                    "type": "number",
+                    "description": "临时底价覆盖（0=使用广告位配置）"
+                  },
+                  "timeout_ms": {
+                    "type": "integer",
+                    "description": "超时覆盖（0=使用广告源配置）"
+                  }
+                }
+              },
+              "example": {
+                "placement_id": "placement_rewarded_001",
+                "app": {
+                  "bundle_id": "com.example.mygame",
+                  "version": "1.0.0"
+                },
+                "device": {
+                  "platform": "ios",
+                  "os_version": "17.0",
+                  "device_model": "iPhone15,2",
+                  "ifa": "550e8400-e29b-41d4-a716-446655440000",
+                  "screen_w": 390,
+                  "screen_h": 844,
+                  "language": "zh-CN",
+                  "conn_type": "wifi"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "广告填充成功",
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": 0,
+                  "message": "success",
+                  "data": {
+                    "request_id": "d2501f7355f4071c",
+                    "placement_id": "placement_rewarded_001",
+                    "ad_type": "rewarded_video",
+                    "bid_mode": "s2s",
+                    "winner_dsp_id": "dsp_gamma",
+                    "winner_price": 2.1064,
+                    "is_mock": false,
+                    "status": "success",
+                    "vast_xml": "<?xml version=\"1.0\"?><VAST version=\"4.2\">...</VAST>",
+                    "click_url": "https://example.com",
+                    "track_urls": {
+                      "impression": "http://localhost:8080/api/v1/track?event=impression&request_id=d2501f7355f4071c",
+                      "click": "http://localhost:8080/api/v1/track?event=click&request_id=d2501f7355f4071c",
+                      "start": "http://localhost:8080/api/v1/track?event=start&request_id=d2501f7355f4071c",
+                      "first_quartile": "http://localhost:8080/api/v1/track?event=firstQuartile&request_id=d2501f7355f4071c",
+                      "midpoint": "http://localhost:8080/api/v1/track?event=midpoint&request_id=d2501f7355f4071c",
+                      "third_quartile": "http://localhost:8080/api/v1/track?event=thirdQuartile&request_id=d2501f7355f4071c",
+                      "complete": "http://localhost:8080/api/v1/track?event=complete&request_id=d2501f7355f4071c"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "204": {
+            "description": "无广告填充（所有 DSP 无出价且 Mock 广告也无可用素材）"
+          }
+        }
+      }
+    },
+    "/api/v1/sdk/init_complete": {
+      "post": {
+        "tags": [
+          "SDK Init"
+        ],
+        "summary": "上报初始化完成结果",
+        "description": "SDK 完成各广告网络 SDK 的初始化后调用。\n\n服务端根据初始化结果：\n- 若所有网络初始化成功 → 返回 `{message: 'all networks initialized successfully'}`\n- 若有网络初始化失败 → 返回调整后的 Waterfall 配置（移除失败网络的广告源）\n\n**调用时机**：`/sdk/init` 响应处理完成，所有网络 SDK 初始化尝试结束后",
+        "operationId": "sdkInitComplete",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "example": {
+                "app_id": "app_ios_001",
+                "sdk_version": "1.0.0",
+                "platform": "ios",
+                "duration_ms": 1500,
+                "networks": [
+                  {
+                    "network_type": "admob",
+                    "status": "success",
+                    "duration_ms": 800,
+                    "adapter_version": "9.14.0"
+                  },
+                  {
+                    "network_type": "unity",
+                    "status": "failed",
+                    "error_msg": "Unity SDK init timeout",
+                    "duration_ms": 3000,
+                    "adapter_version": "4.9.2"
+                  },
+                  {
+                    "network_type": "custom",
+                    "status": "success",
+                    "duration_ms": 10
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "上报成功",
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": 0,
+                  "message": "success",
+                  "data": {
+                    "message": "1 network(s) failed, waterfall adjusted",
+                    "adjusted_placements": [
+                      {
+                        "placement_id": "placement_rewarded_001",
+                        "ad_type": "rewarded_video",
+                        "waterfall": [
+                          {
+                            "source_id": "admob_rewarded",
+                            "network_type": "admob",
+                            "bid_mode": "c2s",
+                            "priority": 1,
+                            "ad_unit_id": "ca-app-pub-xxx/yyy"
+                          },
+                          {
+                            "source_id": "dsp_alpha",
+                            "network_type": "custom",
+                            "bid_mode": "s2s",
+                            "priority": 2
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sdk/heartbeat": {
+      "post": {
+        "tags": [
+          "SDK Init"
+        ],
+        "summary": "SDK 心跳上报",
+        "description": "SDK 定期上报在线状态（默认每 5 分钟一次，由 `/sdk/init` 响应中的 `global.heartbeat_interval_s` 控制）。\n\n服务端返回 `config_updated=true` 时，SDK 应重新调用 `/sdk/init` 获取最新配置。响应中还包含 `config_hash` 和 `refresh_reason`，便于客户端判断刷新原因。",
+        "operationId": "sdkHeartbeat",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "example": {
+                "app_id": "app_ios_001",
+                "sdk_version": "1.0.0",
+                "platform": "ios",
+                "ifa": "550e8400-e29b-41d4-a716-446655440000",
+                "active_placements": [
+                  "placement_rewarded_001"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "心跳成功",
+            "content": {
+              "application/json": {
+                "example": {
+                  "code": 0,
+                  "message": "success",
+                  "data": {
+                    "config_updated": false,
+                    "server_time": 1778847533663
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sdk/ecpm": {
+      "post": {
+        "tags": [
+          "SDK Init"
+        ],
+        "summary": "上报 eCPM 数据",
+        "description": "C2S 竞价完成后上报实际 eCPM，用于优化 Waterfall 排序。\n\n**调用时机**：\n- C2S 模式：SDK 从广告网络获得出价后立即上报\n- 展示后：广告实际展示后上报（`displayed=true`）\n\n服务端会根据历史 eCPM 数据动态调整 Waterfall 中各广告源的排序。",
+        "operationId": "sdkReportECPM",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "example": {
+                "app_id": "app_ios_001",
+                "placement_id": "placement_rewarded_001",
+                "source_id": "admob_rewarded",
+                "network_type": "admob",
+                "ecpm": 5.2,
+                "ad_type": "rewarded_video",
+                "displayed": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "上报成功"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "StrategyResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "example": 0
+          },
+          "message": {
+            "type": "string",
+            "example": "success"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "placement_id": {
+                "type": "string"
+              },
+              "ad_type": {
+                "type": "string",
+                "enum": [
+                  "rewarded_video",
+                  "interstitial",
+                  "banner",
+                  "native"
+                ]
+              },
+              "floor_price": {
+                "type": "number",
+                "description": "广告位全局底价 (USD CPM)"
+              },
+              "sources": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/StrategySource"
+                }
+              },
+              "app": {
+                "$ref": "#/components/schemas/AppInfo"
+              }
+            }
+          }
+        }
+      },
+      "StrategySource": {
+        "type": "object",
+        "properties": {
+          "source_id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "bid_mode": {
+            "type": "string",
+            "enum": [
+              "s2s",
+              "c2s",
+              "waterfall"
+            ]
+          },
+          "priority": {
+            "type": "integer"
+          },
+          "floor_price": {
+            "type": "number"
+          },
+          "timeout_ms": {
+            "type": "integer"
+          },
+          "status": {
+            "type": "string"
+          },
+          "network_type": {
+            "type": "string",
+            "description": "广告网络类型：admob/applovin/unity/pangle/mintegral/ironsource/custom 等"
+          },
+          "app_id": {
+            "type": "string",
+            "description": "广告网络 App ID（如 AdMob: ca-app-pub-xxx）"
+          },
+          "app_key": {
+            "type": "string",
+            "description": "SDK Key（如 AppLovin SDK Key）"
+          },
+          "ad_unit_id": {
+            "type": "string",
+            "description": "广告单元 ID"
+          },
+          "extra_params": {
+            "type": "string",
+            "description": "扩展参数 JSON"
+          },
+          "dsp_config": {
+            "$ref": "#/components/schemas/DSPConfig"
+          }
+        }
+      },
+      "AppInfo": {
+        "type": "object",
+        "properties": {
+          "app_id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "platform": {
+            "type": "string",
+            "enum": [
+              "ios",
+              "android",
+              "both"
+            ]
+          },
+          "bundle_id": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          }
+        }
+      },
+      "DSPConfig": {
+        "type": "object",
+        "description": "内置 DSP 模拟器配置（network_type=custom 时有效）",
+        "properties": {
+          "bid_mode": {
+            "type": "string",
+            "enum": [
+              "fixed",
+              "random",
+              "probabilistic"
+            ]
+          },
+          "bid_value": {
+            "type": "number"
+          },
+          "bid_min": {
+            "type": "number"
+          },
+          "bid_max": {
+            "type": "number"
+          },
+          "fill_rate": {
+            "type": "number",
+            "description": "填充率 0~100"
+          },
+          "latency_ms": {
+            "type": "integer"
+          },
+          "error_rate": {
+            "type": "number"
+          }
+        }
+      },
+      "S2SBidRequest": {
+        "type": "object",
+        "required": [
+          "placement_id"
+        ],
+        "properties": {
+          "placement_id": {
+            "type": "string",
+            "description": "广告位 ID"
+          },
+          "app": {
+            "type": "object",
+            "properties": {
+              "bundle": {
+                "type": "string",
+                "description": "应用包名（留空则从广告位关联的 App 自动填充）"
+              },
+              "name": {
+                "type": "string"
+              },
+              "version": {
+                "type": "string"
+              }
+            }
+          },
+          "device": {
+            "type": "object",
+            "properties": {
+              "ua": {
+                "type": "string",
+                "description": "User-Agent"
+              },
+              "ip": {
+                "type": "string",
+                "description": "设备 IP"
+              },
+              "os": {
+                "type": "string",
+                "description": "操作系统：iOS / Android"
+              },
+              "model": {
+                "type": "string",
+                "description": "设备型号"
+              },
+              "ifa": {
+                "type": "string",
+                "description": "广告标识符（IDFA/GAID）"
+              }
+            }
+          }
+        }
+      },
+      "S2SBidResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "request_id": {
+                "type": "string",
+                "description": "16位 hex 唯一请求 ID"
+              },
+              "winner_dsp_id": {
+                "type": "string"
+              },
+              "winner_price": {
+                "type": "number",
+                "description": "胜出价格 (USD CPM)"
+              },
+              "ad_markup": {
+                "type": "string",
+                "description": "广告标记（VAST XML 或其他格式）"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "success",
+                  "no_fill",
+                  "error"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "C2SReportRequest": {
+        "type": "object",
+        "required": [
+          "request_id",
+          "placement_id",
+          "bidding_details"
+        ],
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "description": "SDK 自行生成的唯一请求 ID（16位 hex 推荐）"
+          },
+          "placement_id": {
+            "type": "string"
+          },
+          "winner_dsp_id": {
+            "type": "string"
+          },
+          "winner_price": {
+            "type": "number"
+          },
+          "displayed": {
+            "type": "boolean",
+            "description": "是否已展示（false=仅上报竞价结果，true=已展示）"
+          },
+          "bidding_details": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "dsp_id": {
+                  "type": "string"
+                },
+                "bid_price": {
+                  "type": "number"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "win",
+                    "lose",
+                    "no_bid",
+                    "timeout",
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "description": "错误码（非零）"
+          },
+          "message": {
+            "type": "string"
+          },
+          "details": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "管理 API 需要。SDK API 无需认证。开发模式下留空即可。"
+      }
+    }
+  }
+}

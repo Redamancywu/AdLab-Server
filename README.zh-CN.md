@@ -123,6 +123,8 @@ npm run dev
 
 - [部署文档](./adlab-server/docs/deploy-postgres-compose.md)
 - [SDKAPI 部署文档](./adlab-server/docs/deploy-sdkapi.md)
+- [SDK 客户端接入指南](./adlab-server/docs/sdk-client-integration.md)
+- [OpenAPI 规范（仓库副本）](./adlab-server/docs/sdk-api.json)
 - [管理后台整合设计](./docs/2026-05-16-adlab-admin-consolidation-design.md)
 
 ## SDK API 运行模式
@@ -166,6 +168,10 @@ SDK API 模式会暴露：
 
 - `/health`：基础存活检查
 - `/ready`：就绪检查（包含数据库连通性）
+- `/version`：运行时构建信息
+- `/metrics`：轻量级请求指标
+- `/docs`：Swagger UI
+- `/docs/openapi.json`：运行时 OpenAPI 文档
 
 可以用下面的命令做一次最小 smoke 检查：
 
@@ -182,6 +188,22 @@ make smoke-sdkapi
 cd adlab-server
 docker compose -f docker-compose.sdkapi.yml up -d
 ```
+
+## SDK 接入说明
+
+当前推荐给客户端开发者的主流程是：
+
+1. `POST /api/v1/sdk/init`
+2. `POST /api/v1/sdk/init_complete`
+3. `POST /api/v1/ad/request`
+4. 如返回 `c2s_sources`，在本地完成 C2S 竞价后调用 `POST /api/v1/c2s/result`
+5. `GET/POST /api/v1/track`
+6. `POST /api/v1/sdk/heartbeat`
+
+最直接的参考文档：
+
+- [SDK 客户端接入指南](./adlab-server/docs/sdk-client-integration.md)
+- [OpenAPI 规范（仓库副本）](./adlab-server/docs/sdk-api.json)
 
 ## 社区协作
 

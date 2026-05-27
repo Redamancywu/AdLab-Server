@@ -123,6 +123,8 @@ Cloud-ready env templates:
 
 - [Deployment guide](./adlab-server/docs/deploy-postgres-compose.md)
 - [SDKAPI deployment guide](./adlab-server/docs/deploy-sdkapi.md)
+- [SDK client integration guide](./adlab-server/docs/sdk-client-integration.md)
+- [OpenAPI spec (repo copy)](./adlab-server/docs/sdk-api.json)
 - [Admin consolidation design](./docs/2026-05-16-adlab-admin-consolidation-design.md)
 
 ## SDK API Mode
@@ -167,6 +169,10 @@ The SDK API mode exposes:
 
 - `/health` for basic liveness
 - `/ready` for readiness (including DB reachability)
+- `/version` for runtime build metadata
+- `/metrics` for lightweight request and status metrics
+- `/docs` for Swagger UI
+- `/docs/openapi.json` for the live OpenAPI document
 
 You can run a quick smoke check:
 
@@ -183,6 +189,22 @@ For a minimal deployment shape without admin/backend/nginx:
 cd adlab-server
 docker compose -f docker-compose.sdkapi.yml up -d
 ```
+
+## SDK Integration Notes
+
+For client developers, the current recommended lifecycle is:
+
+1. `POST /api/v1/sdk/init`
+2. `POST /api/v1/sdk/init_complete`
+3. `POST /api/v1/ad/request`
+4. Optional local C2S bidding via `c2s_sources`, then `POST /api/v1/c2s/result`
+5. `GET/POST /api/v1/track`
+6. `POST /api/v1/sdk/heartbeat`
+
+The most direct references are:
+
+- [SDK client integration guide](./adlab-server/docs/sdk-client-integration.md)
+- [OpenAPI spec (repo copy)](./adlab-server/docs/sdk-api.json)
 
 ## Community
 

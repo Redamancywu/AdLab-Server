@@ -23,7 +23,12 @@ go.mod.backup
 *.swo
 
 # Docs
-docs/
+/docs/*
+!/docs/
+!/docs/2026-05-16-adlab-admin-consolidation-design.md
+!/docs/assets/
+/docs/assets/*
+!/docs/assets/adlab-admin-dashboard.png
 *.docx
 
 # Markdown (except root docs)
@@ -33,6 +38,11 @@ docs/
 !CODE_OF_CONDUCT.md
 !CONTRIBUTING.md
 !LICENSE
+!/docs/2026-05-16-adlab-admin-consolidation-design.md
+!adlab-server/docs/deploy-postgres-compose.md
+!adlab-server/docs/deploy-sdkapi.md
+!adlab-server/docs/sdk-client-integration.md
+!adlab-server/docs/sdk-api.json
 
 # Project specific
 .kiro/
