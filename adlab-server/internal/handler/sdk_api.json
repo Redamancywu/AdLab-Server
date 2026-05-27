@@ -686,6 +686,44 @@
         }
       }
     },
+    "/api/v1/logs/requests/{request_id}/details": {
+      "get": {
+        "tags": [
+          "Logs"
+        ],
+        "summary": "获取单次竞价的 DSP 明细",
+        "operationId": "getBidDetails",
+        "parameters": [
+          {
+            "name": "request_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "DSP 明细列表"
+          }
+        }
+      }
+    },
+    "/api/v1/logs/export": {
+      "get": {
+        "tags": [
+          "Logs"
+        ],
+        "summary": "导出日志",
+        "operationId": "exportLogs",
+        "responses": {
+          "200": {
+            "description": "导出成功"
+          }
+        }
+      }
+    },
     "/api/v1/logs/tracking/{request_id}": {
       "get": {
         "tags": [
@@ -706,6 +744,48 @@
         "responses": {
           "200": {
             "description": "追踪事件列表（按时间戳升序）"
+          }
+        }
+      }
+    },
+    "/api/v1/stats/overview": {
+      "get": {
+        "tags": [
+          "Logs"
+        ],
+        "summary": "获取总体统计概览",
+        "operationId": "getStatsOverview",
+        "responses": {
+          "200": {
+            "description": "统计概览"
+          }
+        }
+      }
+    },
+    "/api/v1/stats/dsp": {
+      "get": {
+        "tags": [
+          "Logs"
+        ],
+        "summary": "获取 DSP 维度统计",
+        "operationId": "getStatsDSP",
+        "responses": {
+          "200": {
+            "description": "DSP 统计"
+          }
+        }
+      }
+    },
+    "/api/v1/stats/timeseries": {
+      "get": {
+        "tags": [
+          "Logs"
+        ],
+        "summary": "获取时序统计",
+        "operationId": "getStatsTimeseries",
+        "responses": {
+          "200": {
+            "description": "时序统计"
           }
         }
       }
@@ -735,6 +815,85 @@
           },
           "503": {
             "description": "服务异常（数据库连接失败）"
+          }
+        }
+      }
+    },
+    "/ready": {
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "summary": "就绪检查",
+        "operationId": "ready",
+        "responses": {
+          "200": {
+            "description": "服务就绪"
+          },
+          "503": {
+            "description": "服务未就绪"
+          }
+        }
+      }
+    },
+    "/version": {
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "summary": "版本信息",
+        "operationId": "version",
+        "responses": {
+          "200": {
+            "description": "版本信息"
+          }
+        }
+      }
+    },
+    "/metrics": {
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "summary": "Prometheus 指标",
+        "operationId": "metrics",
+        "responses": {
+          "200": {
+            "description": "指标文本"
+          }
+        }
+      }
+    },
+    "/api/v1/docs/{key}": {
+      "get": {
+        "tags": [
+          "SDK Init"
+        ],
+        "summary": "获取客户端接入文档",
+        "description": "返回 iOS / Android / Web / API 四类客户端开发者文档内容。",
+        "operationId": "getDeveloperDoc",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ios",
+                "android",
+                "web",
+                "api"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "文档内容"
+          },
+          "404": {
+            "description": "文档不存在"
           }
         }
       }

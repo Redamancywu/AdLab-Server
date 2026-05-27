@@ -77,6 +77,36 @@ func (r *PlacementRepository) FindAll(page, pageSize int) ([]model.Placement, in
 	return placements, total, nil
 }
 
+// FindByAppID 查询指定 App 下的所有广告位（支持分页）
+func (r *PlacementRepository) FindByAppID(appID string, page, pageSize int) ([]model.Placement, int64, error) {
+	var placements []model.Placement
+	var total int64
+
+	query := r.db.Model(&model.Placement{}).Where("app_id = ?", appID)
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, errors.Wrap(errors.CodeDatabaseError, "统计应用广告位数量失败", err)
+	}
+
+	if page > 0 && pageSize > 0 {
+		offset := (page - 1) * pageSize
+		query = query.Offset(offset).Limit(pageSize)
+	}
+
+	if err := query.Find(&placements).Error; err != nil {
+		return nil, 0, errors.Wrap(errors.CodeDatabaseError, "查询应用广告位列表失败", err)
+	}
+
+	for i := range placements {
+		var count int64
+		if err := r.db.Model(&model.PlacementSource{}).Where("placement_id = ?", placements[i].PlacementID).Count(&count).Error; err != nil {
+			return nil, 0, errors.Wrap(errors.CodeDatabaseError, "统计应用广告位绑定数量失败", err)
+		}
+		placements[i].BindingCount = int(count)
+	}
+
+	return placements, total, nil
+}
+
 // Create 创建广告位
 func (r *PlacementRepository) Create(placement *model.Placement) error {
 	var count int64

@@ -36,19 +36,26 @@ func (s *SDKService) InitComplete(ctx context.Context, req *SDKInitCompleteReque
 		return &SDKInitCompleteResponse{Message: "all networks initialized successfully"}, nil
 	}
 
-	initResp, err := s.Init(ctx, &SDKInitRequest{AppID: req.AppID, Platform: req.Platform})
+	initResp, err := s.buildInitResponse(ctx, &SDKInitRequest{AppID: req.AppID, Platform: req.Platform})
 	if err != nil {
-		return &SDKInitCompleteResponse{Message: "ok"}, nil
+		return nil, err
 	}
 
 	var adjusted []SDKPlacementConfig
 	for _, p := range initResp.Placements {
+		var filteredInstances []SDKPlacementInstance
+		for _, instance := range p.Instances {
+			if !failedNetworks[instance.NetworkType] {
+				filteredInstances = append(filteredInstances, instance)
+			}
+		}
 		var filteredWaterfall []SDKWaterfallItem
 		for _, item := range p.Waterfall {
 			if !failedNetworks[item.NetworkType] {
 				filteredWaterfall = append(filteredWaterfall, item)
 			}
 		}
+		p.Instances = filteredInstances
 		p.Waterfall = filteredWaterfall
 		adjusted = append(adjusted, p)
 	}
@@ -69,11 +76,27 @@ func (s *SDKService) Heartbeat(ctx context.Context, req *SDKHeartbeatRequest) (*
 	})
 
 	currentVersion := s.GetConfigVersion()
-	configUpdated := req.ConfigVersion > 0 && req.ConfigVersion != currentVersion
-	configHash := fmt.Sprintf("v%d", currentVersion)
+	configHash := ""
+	if req.AppID != "" {
+		initResp, err := s.buildInitResponse(ctx, &SDKInitRequest{
+			AppID:    req.AppID,
+			Platform: req.Platform,
+		})
+		if err != nil {
+			return nil, err
+		}
+		configHash = initResp.ConfigHash
+	}
+
+	configUpdated := false
 	refreshReason := ""
-	if configUpdated {
+
+	if req.ConfigVersion > 0 && req.ConfigVersion != currentVersion {
+		configUpdated = true
 		refreshReason = "config_version_changed"
+	} else if req.ConfigHash != "" && configHash != "" && req.ConfigHash != configHash {
+		configUpdated = true
+		refreshReason = "config_hash_changed"
 	}
 
 	return &SDKHeartbeatResponse{

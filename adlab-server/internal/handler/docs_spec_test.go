@@ -37,3 +37,29 @@ func TestRepoSDKAPISpecMatchesEmbeddedSpec(t *testing.T) {
 		t.Fatalf("repo sdk api spec is out of sync with embedded runtime spec")
 	}
 }
+
+func TestEmbeddedSpecCoversPublicSDKAPIRoutes(t *testing.T) {
+	t.Parallel()
+
+	var spec struct {
+		Paths map[string]any `json:"paths"`
+	}
+	if err := json.Unmarshal([]byte(openAPISpec), &spec); err != nil {
+		t.Fatalf("embedded sdk api spec should be valid json: %v", err)
+	}
+
+	requiredPaths := []string{
+		"/api/v1/docs/{key}",
+		"/api/v1/logs/export",
+		"/api/v1/logs/requests/{request_id}/details",
+		"/api/v1/stats/overview",
+		"/api/v1/stats/dsp",
+		"/api/v1/stats/timeseries",
+	}
+
+	for _, path := range requiredPaths {
+		if _, ok := spec.Paths[path]; !ok {
+			t.Fatalf("expected embedded sdk api spec to cover %s", path)
+		}
+	}
+}

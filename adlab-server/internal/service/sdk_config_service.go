@@ -12,6 +12,10 @@ import (
 // Init SDK 初始化
 // 返回格式对标 TopOn/MAX：App 级别网络列表 + 广告位 Waterfall 配置
 func (s *SDKService) Init(ctx context.Context, req *SDKInitRequest) (*SDKInitResponse, error) {
+	return s.buildInitResponse(ctx, req)
+}
+
+func (s *SDKService) buildInitResponse(ctx context.Context, req *SDKInitRequest) (*SDKInitResponse, error) {
 	if req.AppID == "" {
 		return nil, errors.New(errors.CodeValidationFailed, "app_id 不能为空")
 	}
@@ -24,7 +28,7 @@ func (s *SDKService) Init(ctx context.Context, req *SDKInitRequest) (*SDKInitRes
 		return nil, errors.New(errors.CodeEntityNotFound, "应用未激活: "+req.AppID)
 	}
 
-	allPlacements, _, err := s.placementRepo.FindAll(0, 0)
+	allPlacements, _, err := s.placementRepo.FindByAppID(req.AppID, 0, 0)
 	if err != nil {
 		return nil, errors.Wrap(errors.CodeDatabaseError, "查询广告位失败", err)
 	}
@@ -46,7 +50,7 @@ func (s *SDKService) Init(ctx context.Context, req *SDKInitRequest) (*SDKInitRes
 
 	var sdkPlacements []SDKPlacementConfig
 	for _, placement := range allPlacements {
-		if placement.AppID != req.AppID || placement.Status != "active" {
+		if placement.Status != "active" {
 			continue
 		}
 		placementConfig, err := s.buildPlacementConfig(&placement, networkMap)

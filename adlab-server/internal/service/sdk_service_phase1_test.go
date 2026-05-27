@@ -140,3 +140,237 @@ func TestSDKInitPrefersAppNetworkConfigAndEmitsInstances(t *testing.T) {
 		t.Fatalf("expected compatibility waterfall to be emitted")
 	}
 }
+
+func TestSDKHeartbeatReusesInitConfigHash(t *testing.T) {
+	db := setupSDKServiceTestDB(t)
+
+	appRepo := repository.NewAppRepository(db)
+	placementRepo := repository.NewPlacementRepository(db)
+	sourceRepo := repository.NewAdSourceRepository(db)
+	cfgRepo := repository.NewAppNetworkConfigRepository(db)
+	trackingRepo := repository.NewTrackingEventLogRepository(db)
+
+	app := &model.App{
+		AppID:              "app_sdk_hash",
+		Name:               "SDK Hash App",
+		Platform:           "ios",
+		BundleID:           "com.example.hash",
+		Category:           "game",
+		Status:             "active",
+		EnableMockFallback: true,
+	}
+	if err := appRepo.Create(app); err != nil {
+		t.Fatalf("create app failed: %v", err)
+	}
+
+	if err := cfgRepo.Create(&model.AppNetworkConfig{
+		AppID:          app.AppID,
+		Platform:       "ios",
+		NetworkType:    "admob",
+		AdapterClass:   "AdLabAdMobAdapter",
+		InitParamsJSON: `{"app_id":"ca-app-pub-hash~123"}`,
+		Status:         "active",
+	}); err != nil {
+		t.Fatalf("create app network config failed: %v", err)
+	}
+
+	placement := &model.Placement{
+		PlacementID: "plc_sdk_hash",
+		AppID:       app.AppID,
+		Name:        "SDK Hash Placement",
+		AdType:      "rewarded_video",
+		Status:      "active",
+	}
+	if err := placementRepo.Create(placement); err != nil {
+		t.Fatalf("create placement failed: %v", err)
+	}
+
+	svc := NewSDKService(appRepo, placementRepo, sourceRepo, nil, trackingRepo).WithAppNetworkConfigRepo(cfgRepo)
+
+	initResp, err := svc.Init(context.Background(), &SDKInitRequest{
+		AppID:    app.AppID,
+		Platform: "ios",
+	})
+	if err != nil {
+		t.Fatalf("sdk init failed: %v", err)
+	}
+
+	hbResp, err := svc.Heartbeat(context.Background(), &SDKHeartbeatRequest{
+		AppID:         app.AppID,
+		Platform:      "ios",
+		ConfigVersion: initResp.ConfigVersion,
+		ConfigHash:    initResp.ConfigHash,
+	})
+	if err != nil {
+		t.Fatalf("sdk heartbeat failed: %v", err)
+	}
+
+	if hbResp.ConfigHash != initResp.ConfigHash {
+		t.Fatalf("expected heartbeat config_hash %q to match init %q", hbResp.ConfigHash, initResp.ConfigHash)
+	}
+	if hbResp.ConfigUpdated {
+		t.Fatalf("expected matching version/hash to report no config update")
+	}
+}
+
+func TestSDKInitCompleteFiltersFailedNetworksFromInstancesAndWaterfall(t *testing.T) {
+	db := setupSDKServiceTestDB(t)
+
+	appRepo := repository.NewAppRepository(db)
+	placementRepo := repository.NewPlacementRepository(db)
+	sourceRepo := repository.NewAdSourceRepository(db)
+	cfgRepo := repository.NewAppNetworkConfigRepository(db)
+	trackingRepo := repository.NewTrackingEventLogRepository(db)
+
+	app := &model.App{
+		AppID:              "app_sdk_init_complete",
+		Name:               "SDK Init Complete App",
+		Platform:           "ios",
+		BundleID:           "com.example.initcomplete",
+		Category:           "game",
+		Status:             "active",
+		EnableMockFallback: true,
+	}
+	if err := appRepo.Create(app); err != nil {
+		t.Fatalf("create app failed: %v", err)
+	}
+
+	placement := &model.Placement{
+		PlacementID: "plc_sdk_init_complete",
+		AppID:       app.AppID,
+		Name:        "SDK Init Complete Placement",
+		AdType:      "rewarded_video",
+		Status:      "active",
+	}
+	if err := placementRepo.Create(placement); err != nil {
+		t.Fatalf("create placement failed: %v", err)
+	}
+
+	sourceAdmob := &model.AdSource{
+		SourceID:        "src_admob",
+		Name:            "AdMob Source",
+		BidMode:         "waterfall",
+		Priority:        1,
+		FloorPrice:      1.1,
+		TimeoutMs:       900,
+		Status:          "active",
+		NetworkType:     "admob",
+		HistoricalECPM:  1.8,
+		ECPMSampleCount: 3,
+	}
+	if err := sourceRepo.Create(sourceAdmob); err != nil {
+		t.Fatalf("create admob source failed: %v", err)
+	}
+
+	sourcePangle := &model.AdSource{
+		SourceID:        "src_pangle",
+		Name:            "Pangle Source",
+		BidMode:         "waterfall",
+		Priority:        2,
+		FloorPrice:      0.9,
+		TimeoutMs:       800,
+		Status:          "active",
+		NetworkType:     "pangle",
+		HistoricalECPM:  1.2,
+		ECPMSampleCount: 2,
+	}
+	if err := sourceRepo.Create(sourcePangle); err != nil {
+		t.Fatalf("create pangle source failed: %v", err)
+	}
+
+	if err := placementRepo.BindSourceDetailed(repository.BindSourceParams{
+		PlacementID:  placement.PlacementID,
+		SourceID:     sourceAdmob.SourceID,
+		InstanceID:   "ins_admob",
+		InstanceName: "AdMob Instance",
+		AdUnitID:     "admob-unit",
+		Status:       "active",
+	}); err != nil {
+		t.Fatalf("bind admob source failed: %v", err)
+	}
+
+	if err := placementRepo.BindSourceDetailed(repository.BindSourceParams{
+		PlacementID:  placement.PlacementID,
+		SourceID:     sourcePangle.SourceID,
+		InstanceID:   "ins_pangle",
+		InstanceName: "Pangle Instance",
+		AdUnitID:     "pangle-unit",
+		Status:       "active",
+	}); err != nil {
+		t.Fatalf("bind pangle source failed: %v", err)
+	}
+
+	if err := cfgRepo.Create(&model.AppNetworkConfig{
+		AppID:          app.AppID,
+		Platform:       "ios",
+		NetworkType:    "admob",
+		AdapterClass:   "AdLabAdMobAdapter",
+		InitParamsJSON: `{"app_id":"ca-app-pub-new~123"}`,
+		Status:         "active",
+	}); err != nil {
+		t.Fatalf("create admob app config failed: %v", err)
+	}
+	if err := cfgRepo.Create(&model.AppNetworkConfig{
+		AppID:          app.AppID,
+		Platform:       "ios",
+		NetworkType:    "pangle",
+		AdapterClass:   "AdLabPangleAdapter",
+		InitParamsJSON: `{"app_id":"pangle-app-id"}`,
+		Status:         "active",
+	}); err != nil {
+		t.Fatalf("create pangle app config failed: %v", err)
+	}
+
+	svc := NewSDKService(appRepo, placementRepo, sourceRepo, nil, trackingRepo).WithAppNetworkConfigRepo(cfgRepo)
+
+	resp, err := svc.InitComplete(context.Background(), &SDKInitCompleteRequest{
+		AppID:    app.AppID,
+		Platform: "ios",
+		Networks: []SDKNetworkInitResult{
+			{NetworkType: "admob", Status: "success"},
+			{NetworkType: "pangle", Status: "error", ErrorMsg: "init failed"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("sdk init_complete failed: %v", err)
+	}
+
+	if len(resp.AdjustedPlacements) != 1 {
+		t.Fatalf("expected 1 adjusted placement, got %d", len(resp.AdjustedPlacements))
+	}
+	adjusted := resp.AdjustedPlacements[0]
+	if len(adjusted.Waterfall) != 1 {
+		t.Fatalf("expected failed network to be removed from waterfall, got %d items", len(adjusted.Waterfall))
+	}
+	if adjusted.Waterfall[0].NetworkType != "admob" {
+		t.Fatalf("expected surviving waterfall network to be admob, got %q", adjusted.Waterfall[0].NetworkType)
+	}
+	if len(adjusted.Instances) != 1 {
+		t.Fatalf("expected failed network to be removed from instances, got %d items", len(adjusted.Instances))
+	}
+	if adjusted.Instances[0].NetworkType != "admob" {
+		t.Fatalf("expected surviving instance network to be admob, got %q", adjusted.Instances[0].NetworkType)
+	}
+}
+
+func TestSDKInitCompleteReturnsErrorWhenRefreshInitFails(t *testing.T) {
+	db := setupSDKServiceTestDB(t)
+
+	appRepo := repository.NewAppRepository(db)
+	placementRepo := repository.NewPlacementRepository(db)
+	sourceRepo := repository.NewAdSourceRepository(db)
+	trackingRepo := repository.NewTrackingEventLogRepository(db)
+
+	svc := NewSDKService(appRepo, placementRepo, sourceRepo, nil, trackingRepo)
+
+	_, err := svc.InitComplete(context.Background(), &SDKInitCompleteRequest{
+		AppID:    "missing_app",
+		Platform: "ios",
+		Networks: []SDKNetworkInitResult{
+			{NetworkType: "admob", Status: "error", ErrorMsg: "init failed"},
+		},
+	})
+	if err == nil {
+		t.Fatalf("expected init_complete to return error when refresh init fails")
+	}
+}
