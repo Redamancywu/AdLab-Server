@@ -492,6 +492,24 @@ func (h *AdminHandler) UpdateDSPConfig(c *gin.Context) {
 	c.JSON(http.StatusOK, SuccessResponse{Code: apperrors.CodeSuccess, Message: "updated", Data: existing})
 }
 
+// DeleteDSPConfig 处理 DELETE /admin/dsp-configs/:id
+func (h *AdminHandler) DeleteDSPConfig(c *gin.Context) {
+	sourceID := c.Param("id")
+	existing, err := h.dspConfigRepo.FindBySourceID(sourceID)
+	if err != nil {
+		h.handleRepoError(c, err)
+		return
+	}
+	oldVal := toJSON(*existing)
+	if err := h.dspConfigRepo.Delete(sourceID); err != nil {
+		h.handleRepoError(c, err)
+		return
+	}
+	h.recordChangeLog("dsp_config", sourceID, "delete", oldVal, "")
+	h.invalidateCacheBySource(sourceID)
+	c.JSON(http.StatusOK, SuccessResponse{Code: apperrors.CodeSuccess, Message: "deleted"})
+}
+
 // ─────────────────────────────────────────────
 // Material CRUD
 // ─────────────────────────────────────────────

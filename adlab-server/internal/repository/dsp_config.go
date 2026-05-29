@@ -56,6 +56,18 @@ func (r *DSPConfigRepository) Update(config *model.DSPConfig) error {
 	return nil
 }
 
+// Delete 删除 DSP 配置
+func (r *DSPConfigRepository) Delete(sourceID string) error {
+	result := r.db.Where("source_id = ?", sourceID).Delete(&model.DSPConfig{})
+	if result.Error != nil {
+		return errors.Wrap(errors.CodeDatabaseError, "删除 DSP 配置失败", result.Error)
+	}
+	if result.RowsAffected == 0 {
+		return errors.New(errors.CodeEntityNotFound, "DSP 配置不存在: "+sourceID)
+	}
+	return nil
+}
+
 // FindAll 查询所有 DSP 配置（支持分页）
 func (r *DSPConfigRepository) FindAll(page, pageSize int) ([]model.DSPConfig, int64, error) {
 	var configs []model.DSPConfig

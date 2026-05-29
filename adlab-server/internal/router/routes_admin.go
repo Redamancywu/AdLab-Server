@@ -43,6 +43,7 @@ func registerAdminRoutes(r *gin.Engine, h *Handlers, adminToken string) {
 		admin.GET("/dsp-configs", h.Admin.ListDSPConfigs)
 		admin.POST("/dsp-configs", h.Admin.CreateDSPConfig)
 		admin.PUT("/dsp-configs/:id", h.Admin.UpdateDSPConfig)
+		admin.DELETE("/dsp-configs/:id", h.Admin.DeleteDSPConfig)
 
 		admin.GET("/materials", h.Admin.ListMaterials)
 		admin.POST("/materials", h.Admin.CreateMaterial)

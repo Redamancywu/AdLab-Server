@@ -4,18 +4,18 @@ go 1.25.0
 
 require (
 	github.com/gin-gonic/gin v1.9.1
+	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/spf13/viper v1.18.2
 	golang.org/x/sync v0.12.0
+	golang.org/x/time v0.15.0
 	gorm.io/driver/sqlite v1.5.5
 	gorm.io/gorm v1.25.7
 )
 
 require (
-	github.com/golang-jwt/jwt/v5 v5.3.1 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20221227161230-091c0ba34f0a // indirect
 	github.com/jackc/pgx/v5 v5.4.3 // indirect
-	golang.org/x/time v0.15.0 // indirect
 )
 
 require (
@@ -54,7 +54,7 @@ require (
 	go.uber.org/atomic v1.9.0 // indirect
 	go.uber.org/multierr v1.9.0 // indirect
 	golang.org/x/arch v0.3.0 // indirect
-	golang.org/x/crypto v0.36.0 // indirect
+	golang.org/x/crypto v0.36.0
 	golang.org/x/exp v0.0.0-20230905200255-921286631fa9 // indirect
 	golang.org/x/net v0.38.0 // indirect
 	golang.org/x/sys v0.31.0 // indirect
