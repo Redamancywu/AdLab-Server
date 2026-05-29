@@ -8,7 +8,6 @@ bin/
 
 # Go
 /vendor/
-go.sum
 go.mod.backup
 
 # Database
@@ -43,6 +42,9 @@ go.mod.backup
 !adlab-server/docs/deploy-sdkapi.md
 !adlab-server/docs/sdk-client-integration.md
 !adlab-server/docs/sdk-api.json
+
+# Obsolete
+website/
 
 # Project specific
 .kiro/
